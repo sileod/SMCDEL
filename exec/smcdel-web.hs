@@ -92,46 +92,60 @@ fixTeXinSVG = TL.replace "$" ""
   . TL.replace "p_{" " "
   . TL.replace "} " " "
 
-myCatch :: String -> IO String
-myCatch f = Control.Exception.catch
-  (evaluate (force f) :: IO String)
-  (\e-> return ("ERROR: " ++ show (e :: SomeException)))
+myCatch :: IO (String, KnowStruct) -> KnowStruct -> IO (String, KnowStruct)
+myCatch action kns = Control.Exception.catch
+  (action >>= \(s, updatedKns) -> evaluate (force s) >> return (s, updatedKns))
+  (\e-> return ("ERROR: " ++ show (e :: SomeException), kns))
 
 doJobsWebSafe :: KnowStruct -> [Job] -> IO String
 doJobsWebSafe _     [] = return ""
 doJobsWebSafe mykns (j:js) = do
-  result <- myCatch (doJobWeb mykns j)
-  rest <- doJobsWebSafe mykns js
+  (result, updatedKns) <- myCatch (doJobWeb mykns j) mykns -- 2nd kns as a fallback
+  rest <- doJobsWebSafe updatedKns js
   return $ "<p>" ++ result ++ "</p>\n" ++ rest
 
-doJobWeb :: KnowStruct -> Job -> String
-doJobWeb mykns (TrueQ s f) = unlines
+doJobWeb :: KnowStruct -> Job -> IO (String, KnowStruct)
+doJobWeb mykns (TrueQ s f) = return (unlines
   [ "\\( (\\mathcal{F}, " ++ sStr ++ " ) "
   , if evalViaBdd (mykns, map P s) f then "\\vDash" else "\\not\\vDash"
   , (texForm . simplify) f
-  , "\\)" ] where sStr = " \\{ " ++ intercalate "," (map (\i -> "p_{" ++ show i ++ "}") s) ++ " \\}"
-doJobWeb mykns (ValidQ f) = unlines
+  , "\\)" ], mykns)
+  where sStr = " \\{ " ++ intercalate "," (map (\i -> "p_{" ++ show i ++ "}") s) ++ " \\}"
+
+doJobWeb mykns (ValidQ f) = return (unlines
   [ "\\( \\mathcal{F} "
   , if validViaBdd mykns f then "\\vDash" else "\\not\\vDash"
   , (texForm . simplify) f
-  , "\\)" ]
-doJobWeb mykns (WhereQ f) = unlines
+  , "\\)" ], mykns)
+
+doJobWeb mykns (WhereQ f) = return (unlines
   [ "At which states is \\("
   , (texForm . simplify) f
   , "\\) true?<br /> \\("
   , intercalate "," $ map tex (whereViaBdd mykns f)
-  , "\\)" ]
+  , "\\)" ], mykns)
+
+doJobWeb mykns (UpdateQ f) = do
+  let updatedKns = update mykns f
+  let phiTex = texForm (simplify f)
+  let fPhi = "\\( \\mathcal{F}^{(" ++ phiTex ++ ")} \\)"
+  updatedStruct <- showStructure updatedKns
+  return (unlines
+      ["After updating the model with the new announcement \\(" ++ phiTex ++ "\\),"
+      , "the resulting structure is: " ++ fPhi ++ "<br />"
+      , updatedStruct
+      ], updatedKns)
 
 showStructure :: KnowStruct -> IO String
 showStructure (KnS props lawbdd obs) = do
   svgString <- svgGraph lawbdd
-  return $ "$$ \\mathcal{F} = \\left( \n"
+  return $ "<div>$$ \\mathcal{F} = \\left( \n"
     ++ tex props ++ ", "
-    ++ " \\begin{array}{l} {"++ " \\href{javascript:toggleLaw()}{\\theta} " ++"} \\end{array}\n "
+    ++ " \\begin{array}{l} {"++ " \\href{javascript:void(0);}{\\theta} " ++"} \\end{array}\n "
     ++ ", \\begin{array}{l}\n"
     ++ intercalate " \\\\\n " (map (\(i,os) -> "O_{"++i++"}=" ++ tex os) obs)
     ++ "\\end{array}\n"
-    ++ " \\right) $$ \n <div class='lawbdd' style='display:none;'> where \\(\\theta\\) is this BDD:<br /><p align='center'>" ++ svgString ++ "</p></div>"
+    ++ " \\right) $$ \n <div class='lawbdd' style='display:none;'> where \\(\\theta\\) is this BDD:<br /><p align='center'>" ++ svgString ++ "</p></div></div>"
 
 embeddedFile :: String -> T.Text
 embeddedFile s = case s of

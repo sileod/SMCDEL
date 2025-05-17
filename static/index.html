@@ -127,7 +127,9 @@ input[type=button], input[type=submit] {
       success:
         function(data,textStatus,jqXHR) {
           $('#output').html(data);
-          MathJax.typesetPromise();
+          MathJax.typesetPromise().then(() =>
+            jQuery("#output mjx-container mjx-mtable a").click(function(e) { toggleLaw(e); e.preventDefault(); })
+          );
         },
       error:
         function(jqXHR,textStatus,errorThrown) {
@@ -135,8 +137,10 @@ input[type=button], input[type=submit] {
         }
     });
   }
-  function toggleLaw() {
-    $('.lawbdd').fadeToggle();
+  function toggleLaw(event) {
+    var mjx = jQuery(event.currentTarget).parent().parent().parent().parent().parent().parent().parent().parent();
+    var bdd = mjx.parent().next('.lawbdd');
+    bdd.fadeToggle();
   }
   $(document).keydown(function(e) {
     if(e.ctrlKey && e.key == "s") {
