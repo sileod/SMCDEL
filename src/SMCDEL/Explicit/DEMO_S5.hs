@@ -39,6 +39,9 @@ instance Show state => Show (EpistM state) where
     , show points
     ]
 
+worldsOf :: EpistM a -> [a]
+worldsOf (Mo ws _ _ _ _ ) = ws
+
 rel :: Show a => Agent -> EpistM a -> Erel a
 rel ag (Mo _ _ _ rels _) = apply rels ag
 
@@ -63,13 +66,28 @@ sortL  = sortBy
                 then GT
               else compare xs ys)
 
+newtype DemoFun a = Fun (a -> Bool)
+
+-- The following three instances are just to make deriving work for `DemoForm`.
+
+instance Eq (DemoFun a) where
+  (==) _ _ = False
+
+instance Ord (DemoFun a) where
+  compare _ _ = EQ
+
+instance Show (DemoFun a) where
+  show _ = "Fun_"
+
 data DemoForm a = Top
             | Info a
             | Prp DemoPrp
             | Ng (DemoForm a)
             | Conj [DemoForm a]
             | Disj [DemoForm a]
+            | Lam (DemoFun a) -- ^ Property holds at current world.
             | Kn Agent (DemoForm a)
+            | Kl Agent (DemoFun a) -- ^ Agent knows that property holds.
             | PA (DemoForm a) (DemoForm a)
             | PAW (DemoForm a) (DemoForm a)
           deriving (Eq,Ord,Show)
@@ -87,7 +105,9 @@ isTrueAt (Mo _ _ val _ _) w (Prp p) = p `elem` apply val w
 isTrueAt m w (Ng f) = not (isTrueAt m w f)
 isTrueAt m w (Conj fs) = all (isTrueAt m w) fs
 isTrueAt m w (Disj fs) = any (isTrueAt m w) fs
+isTrueAt _ w (Lam (Fun fn)) = fn w
 isTrueAt m w (Kn ag f) = all (flip (isTrueAt m) f) (bl (rel ag m) w)
+isTrueAt m w (Kl ag (Fun fn)) = all fn (bl (rel ag m) w)
 isTrueAt m w (PA f g) = not (isTrueAt m w f) || isTrueAt (updPa m f) w g
 isTrueAt m w (PAW f g) = not (isTrueAt m w f) || isTrueAt (updPaW m f) w g
 
