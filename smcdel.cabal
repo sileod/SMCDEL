@@ -58,6 +58,7 @@ library
       SMCDEL.Examples
       SMCDEL.Examples.Cheryl
       SMCDEL.Examples.CherylDemo
+      SMCDEL.Examples.CherylSudoku
       SMCDEL.Examples.CoinFlip
       SMCDEL.Examples.DiningCrypto
       SMCDEL.Examples.DoorMat
