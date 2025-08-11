@@ -4,7 +4,6 @@ module Main where
 
 import Prelude
 import Control.Monad (unless)
-import Control.Monad.IO.Class (liftIO)
 import Control.Arrow
 import Control.DeepSeq (force)
 import Control.Exception (evaluate, catch, SomeException)
@@ -47,10 +46,10 @@ main = do
     get "/mode-smcdel.js" $ js >> html (TL.fromStrict $ embeddedFile "mode-smcdel.js")
     get "/viz-lite.js"    $ js >> html (TL.fromStrict $ embeddedFile "viz-lite.js")
     get "/getExample" $ do
-      this <- param "filename"
+      this <- queryParam "filename"
       html . TL.fromStrict $ embeddedFile this
     post "/check" $ do
-      smcinput <- param "smcinput"
+      smcinput <- formParam "smcinput"
       case alexScanTokensSafe smcinput of
         Left pos -> webError Lex (Just pos) []
         Right lexResult -> case parse lexResult of
@@ -67,7 +66,7 @@ main = do
                 , "<hr />\n"
                 , TL.pack results ]
     post "/knsToKripke" $ do
-      smcinput <- param "smcinput"
+      smcinput <- formParam "smcinput"
       case alexScanTokensSafe smcinput of
         Left pos -> webError Lex (Just pos) []
         Right lexResult -> case parse lexResult of

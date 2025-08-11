@@ -160,7 +160,7 @@ refreshSvg name x = do
     modTime <- getModificationTime f
     currentTime <- getCurrentTime
     return $ diffUTCTime currentTime modTime > 3600
-  if todo then makeSvg name x else putStrLn (f ++ "already exists")
+  if todo then makeSvg name x else putStrLn (f ++ " already exists and not older than 1h")
 
 -- | Use Template Haskell to add markdown that shows the SVG from the @docs@ folder.
 addSvg :: Name -> Q [Dec]

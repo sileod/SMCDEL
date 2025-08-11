@@ -74,13 +74,13 @@ letter = CoopTask letterStart actions letterGoal where
 
 With a search depth of 2 we find this plan:
 
->>> ppICPlan (head (findSequentialIcPlan 2 letter))
-"1:1->2; 2:2->3."
+>>> map ppICPlan (take 1 (findSequentialIcPlan 2 letter))
+["1:1->2; 2:2->3."]
 
 Note that this is depth-first search which can lead to unnecessarily long plans:
 
->>> ppICPlan (head (findSequentialIcPlan 4 letter))
-"1:1->2; 2:2->1; 1:1->2; 2:2->3."
+>>> map ppICPlan (take 1 (findSequentialIcPlan 4 letter))
+["1:1->2; 2:2->1; 1:1->2; 2:2->3."]
 
 We can also use breadth-first search:
 

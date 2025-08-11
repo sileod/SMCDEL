@@ -2,7 +2,7 @@
 
 module SMCDEL.Examples.Toynabi where
 
-import Data.List ((\\),sort)
+import Data.List ((\\),sort,uncons)
 
 import SMCDEL.Language
 import SMCDEL.Symbolic.S5

@@ -321,8 +321,8 @@ We can thus filter out the 102 safe announcements within a few seconds,
 generating and verifying the same list as in Figure 3 from [vD2003]
 where it was manually generated.
 
->>> head safeHandLists
-[[0,1,2],[0,3,4],[0,5,6],[1,3,5],[1,4,6],[2,3,6]]
+>>> take 1 safeHandLists
+[[[0,1,2],[0,3,4],[0,5,6],[1,3,5],[1,4,6],[2,3,6]]]
 
 >>> last safeHandLists
 [[0,1,2],[0,5,6],[1,4,6],[2,3,6],[3,4,5]]
@@ -356,7 +356,7 @@ For example, the first action Alice will consider is this:
 
 ==== __Show me__
 
->>> ppFormWith rcExplain (head alicesActions)
+>>> concatMap (ppFormWith rcExplain) (take 1 alicesActions)
 "((Alice has card 0 & Alice has card 1 & Alice has card 2) | (Alice has card 0 & Alice has card 1 & Alice has card 3) | (Alice has card 0 & Alice has card 1 & Alice has card 4) | (Alice has card 0 & Alice has card 1 & Alice has card 5) | (Alice has card 0 & Alice has card 1 & Alice has card 6))"
 -}
 
@@ -420,9 +420,9 @@ rcSolutionsViaPlanning = offlineSearch maxSteps start actions constraints goal w
 {- $
 In fact, in both ways we find the same first solution:
 
->>> head rcSolutionsViaPlanning == head rcSolutions
+>>> take 1 rcSolutionsViaPlanning == take 1 rcSolutions
 True
->>> map (ppFormWith rcExplain) (head rcSolutions)
+>>> concatMap (map (ppFormWith rcExplain)) (take 1 rcSolutions)
 ["((Alice has card 0 & Alice has card 1 & Alice has card 2) | (Alice has card 0 & Alice has card 1 & Alice has card 3) | (Alice has card 0 & Alice has card 1 & Alice has card 4) | (Alice has card 0 & Alice has card 1 & Alice has card 5) | (Alice has card 2 & Alice has card 3 & Alice has card 4))","Carol has card 6"]
 -}
 

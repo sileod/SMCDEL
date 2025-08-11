@@ -21,3 +21,4 @@ stack.yaml.lock
 docs/*.svg
 docs/list.txt
 docs/generator.hs
+test_runs

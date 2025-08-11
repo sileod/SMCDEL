@@ -117,7 +117,7 @@ library
     , tagged >=0.8.0 && <0.9
     , template-haskell
     , temporary ==1.3.*
-    , text >=2.0.2 && <2.1
+    , text >=2.0.2 && <2.2
     , time >=1.12.2 && <1.13
   default-language: Haskell2010
   if flag(with-cudd)
@@ -171,7 +171,7 @@ executable smcdel-web
       , deepseq
       , file-embed
       , js-jquery >=3
-      , scotty >=0.11.0 && <0.20
+      , scotty >=0.11.0 && <0.23
       , smcdel
       , template-haskell
       , text

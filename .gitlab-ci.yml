@@ -1,4 +1,4 @@
-image: haskell:9.4.8
+image: haskell:9.8.4
 
 variables:
   STACK_ROOT: "${CI_PROJECT_DIR}/.stack"
@@ -27,7 +27,7 @@ test:
   stage: test
   script:
     - apt-get update -yqq
-    - apt-get install -y --no-install-recommends graphviz dot2tex libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks poppler-utils
+    - apt-get install -y --no-install-recommends graphviz dot2tex python3-pkg-resources libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks poppler-utils
     - rm -rf .stack-work/install/*/*/*/hpc
     - stack --no-terminal test --coverage smcdel:test:examples smcdel:test:k smcdel:test:translations
   coverage: '/(\d+)% top-level declarations used/'
@@ -46,9 +46,9 @@ test-web:
   stage: test
   script:
     - apt-get update -yqq
-    - apt-get install -y --no-install-recommends graphviz dot2tex libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks ca-certificates-java
+    - apt-get install -y --no-install-recommends graphviz dot2tex python3-pkg-resources libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks ca-certificates-java pkg-config
     - apt-get install -y --no-install-recommends openjdk-11-jre-headless firefox-esr wget
-    - stack --no-terminal test --flag smcdel:web smcdel:exe:smcdel-web smcdel:test:web
+    - stack --no-terminal test --flag smcdel:web smcdel:exe:smcdel-web smcdel:test:web --test-arguments "--headless"
   cache:
     <<: *global_cache
     policy: pull
@@ -57,7 +57,7 @@ test-CUDD:
   stage: test
   script:
     - rm -rf .stack-work/install/*/*/*/hpc
-    - stack --no-terminal test --flag smcdel:with-cudd --coverage smcdel:test:CUDD
+    - stack --no-terminal test --allow-newer --flag smcdel:with-cudd --coverage smcdel:test:CUDD
   coverage: '/(\d+)% top-level declarations used/'
   after_script:
     - rm -rf ./hpc
@@ -86,7 +86,7 @@ doc:
   stage: test
   script:
     - apt-get update -yqq
-    - apt-get install -y --no-install-recommends graphviz dot2tex libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks poppler-utils ripgrep
+    - apt-get install -y --no-install-recommends graphviz dot2tex python3-pkg-resources libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks poppler-utils ripgrep
     - stack build smcdel:lib smcdel:test:doctest --haddock
     - rm -rf ./doc
     - mv -v `ls -1 -d -t .stack-work/install/*/*/*/doc | head -n 1` ./doc

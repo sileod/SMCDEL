@@ -60,13 +60,13 @@ Then for any \(\mathcal{L}(U)\)-formula \(\varphi\) we have:
 See Lemma 2.4.1 in [MG2018] for the proof.
 -}
 equivalentWith :: PointedModelS5 -> KnowScene -> StateMap -> Bool
-equivalentWith (KrMS5 ws rel val, actw) (kns@(KnS _ _ obs), curs) g =
+equivalentWith (m@(KrMS5 ws rel val), actw) (kns@(KnS _ _ obs), curs) g =
   c1 && c2 && c3 && g actw == curs where
     c1 = all (\l -> knsLink l == kriLink l) linkSet where
       linkSet = [ (i,w1,w2) | w1 <- ws, w2 <- ws, w1 <= w2, i <- map fst rel ]
       knsLink (i,w1,w2) = let oi = obs ! i in (g w1 `intersect` oi) `seteq` (g w2 `intersect` oi)
       kriLink (i,w1,w2) = any (\p -> w1 `elem` p && w2 `elem` p) (rel ! i)
-    c2 = and [ (p `elem` g w) == ((val ! w) ! p) | w <- ws, p <- map fst (snd $ head val) ]
+    c2 = and [ (p `elem` g w) == ((val ! w) ! p) | w <- ws, p <- vocabOf m ]
     c3 = statesOf kns `seteq` nubOrd (map g ws)
 
 {-|

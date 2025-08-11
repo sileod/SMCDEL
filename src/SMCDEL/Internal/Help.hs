@@ -114,7 +114,9 @@ overlap (x:xs) (y:ys) = case compare x y of
   GT -> overlap (x:xs) ys
 
 bl :: Eq a => Erel a -> a -> [a]
-bl r x = head (filter (elem x) r)
+bl r x = case filter (elem x) r of
+  (b:_) -> b
+  [] -> error "Empty equivalence relation, cannot find block."
 
 fusion :: Ord a => [[a]] -> Erel a
 fusion [] = []

@@ -13,7 +13,7 @@ RUN sudo curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
 ENV PATH=${PATH}:${HOME}/.ghcup/bin
 
 # Set up the environment. This will install the default versions of every tool.
-RUN ghcup install ghc 9.4.7
+RUN ghcup install ghc 9.8.4
 RUN ghcup install hls
 RUN ghcup install stack
 RUN ghcup install cabal

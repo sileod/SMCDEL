@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 
 {- |
 -- * Testing the web interface
@@ -7,7 +7,6 @@
 module Main (main) where
 
 import Control.Concurrent (threadDelay)
-import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text (Text)
 import System.Process (withCreateProcess, proc)
@@ -15,8 +14,8 @@ import Test.Sandwich
 import Test.Sandwich.WebDriver
 import Test.WebDriver
 
-spec :: TopSpec
-spec = introduceWebDriver wdOptions $ do
+spec :: TopSpecWithOptions
+spec = introduceWebDriver defaultWebDriverDependencies wdOptions $ do
   it "MuddyChildren example yields expected result" $ withSession1 $ do
     openPage "http://127.0.0.1:3000/index.html"
     findElem (ByCSS "input[value='MuddyChildren']") >>= click
@@ -55,7 +54,7 @@ wrongAgentInput :: Text
 wrongAgentInput = "VARS 1,2 LAW Top OBS alice: 1 bob: 2 WHERE? charlie knows that 1"
 
 wdOptions :: WdOptions
-wdOptions = (defaultWdOptions "/tmp/tools") {
+wdOptions = defaultWdOptions {
   capabilities = firefoxCapabilities Nothing
   , runMode = RunHeadless defaultHeadlessConfig
   }
@@ -64,5 +63,4 @@ main :: IO ()
 main = do
   withCreateProcess (proc "stack" ["exec", "smcdel-web"]) $
     \_ _ _ _ -> do
-      (_, numFailures) <- runSandwich' Nothing defaultOptions spec
-      when (numFailures > 0) $ error $ show numFailures ++ " tests failed"
+      runSandwichWithCommandLineArgs defaultOptions spec
