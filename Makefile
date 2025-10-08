@@ -21,7 +21,7 @@ todo:
 	@bash -c 'grep -nr "TODO" {src,exec,test,bench}'
 	@bash -c 'grep -nr "FIXME" {src,exec,test,bench}'
 
-ACEVERSION = 1.5.0
+ACEVERSION = 1.43.3
 
 static/ace.js:
 	wget -c "https://github.com/ajaxorg/ace-builds/archive/v$(ACEVERSION).tar.gz" -O static/ace.tgz
