@@ -305,6 +305,25 @@ benchmark bench-diningcrypto
     , time
   default-language: Haskell2010
 
+benchmark bench-memory
+  type: exitcode-stdio-1.0
+  main-is: memory.hs
+  other-modules:
+      Paths_smcdel
+  hs-source-dirs:
+      bench
+  ghc-options: -Wall
+  build-tools:
+      alex
+    , happy
+  build-depends:
+      base >=4.8 && <5
+    , criterion
+    , smcdel
+    , time
+    , weigh
+  default-language: Haskell2010
+
 benchmark bench-muddychildren
   type: exitcode-stdio-1.0
   main-is: muddychildren.hs

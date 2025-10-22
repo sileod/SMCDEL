@@ -33,6 +33,9 @@ cradle:
     - path: "./bench/sumandproduct.hs"
       component: "smcdel:bench:bench-sumandproduct"
 
+    - path: "./bench/memory.hs"
+      component: "smcdel:bench:bench-memory"
+
     - path: "./sizeExperiments/diningcryptographers.hs"
       component: "smcdel:bench:sizes-diningcryptographers"
 

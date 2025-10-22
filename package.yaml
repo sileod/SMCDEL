@@ -221,6 +221,16 @@ benchmarks:
       else:
         cpp-options: ""
 
+  bench-memory:
+    source-dirs: bench
+    main: memory.hs
+    dependencies:
+      - base >= 4.8 && < 5
+      - criterion
+      - smcdel
+      - weigh
+      - time
+
   sizes-muddychildren:
     source-dirs:     sizeExperiments
     main:            muddychildren.hs
