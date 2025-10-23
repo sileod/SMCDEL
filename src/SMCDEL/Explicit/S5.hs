@@ -87,7 +87,8 @@ instance HasAgents KripkeModelS5 where
   agentsOf (KrMS5 _ rel _) = map fst rel
 
 instance HasVocab KripkeModelS5 where
-  vocabOf (KrMS5 _ _ val) = map fst $ snd (head val)
+  vocabOf (KrMS5 _ _ []) = error "empty valuation function"
+  vocabOf (KrMS5 _ _ ((_,v):_)) = map fst v
 
 instance HasWorlds KripkeModelS5 where
   worldsOf (KrMS5 ws _ _) = ws
