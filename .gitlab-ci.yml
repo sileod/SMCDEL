@@ -58,6 +58,13 @@ test-CUDD:
   script:
     - rm -rf .stack-work/install/*/*/*/hpc
     - stack --no-terminal test --allow-newer --flag smcdel:with-cudd --coverage smcdel:test:CUDD
+  only:
+    changes:
+      - test/CUDD.hs
+      - src/SMCDEL/Internal/MyHaskCUDD.hs
+      - src/SMCDEL/Symbolic/S5_CUDD.hs
+      - src/SMCDEL/Symbolic/K_CUDD.hs
+      - src/SMCDEL/Symbolic/Ki_CUDD.hs
   coverage: '/(\d+)% top-level declarations used/'
   after_script:
     - rm -rf ./hpc
