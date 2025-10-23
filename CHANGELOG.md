@@ -5,6 +5,7 @@
 New:
 
 - Language: add global modality `G`
+- Add `UPDATE!` command for in web and cli interface (by @MitchBoontjes)
 
 Changed:
 
