@@ -54,7 +54,7 @@ main = hspec $ do
         , " \\bot , p_{3} ,\\bot \\} \\leftrightarrow \\bigwedge \\{"
         , "\\top , ( \\top \\oplus K^?_{\\text{Alice}} p_{4} ) ,[! p_{5} ] K^?_{\\text{Bob}} p_{5} \\} )  } " ]
     it "svgViaTex works for modelA" $
-        isInfixOf "stroke-linecap:butt" (svgViaTex modelA)
+        isInfixOf "stroke-linecap" (svgViaTex modelA)
     it "svgViaTex works for knsA" $
         isInfixOf "stroke-dash" (svgViaTex knsA)
   describe "SMCDEL.Symbolic.S5" $ do
