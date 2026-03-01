@@ -69,6 +69,11 @@ size b = if sizeOf b == 0 then sizeOf b + 1 else sizeOf b + 2
 relabelWith :: [(Prp,Prp)] -> Bdd -> Bdd
 relabelWith r = relabel (sort $ map (fromEnum *** fromEnum) r)
 
+-- | BDD to say that exactly this subset of a given vocabulary is true.
+-- Similar to `booloutofForm`.
+booloutof :: [Prp] -> [Prp] -> Bdd
+booloutof ps qs = conSet [ (if P n `elem` ps then id else neg) (var n) | (P n) <- qs ]
+
 -- * Knowledge Structures
 
 {- | Knowledge structures are a compact representation of S5 Kripke models.

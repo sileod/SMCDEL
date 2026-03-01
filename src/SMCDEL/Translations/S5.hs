@@ -180,13 +180,6 @@ kripkeToKnsWithG m@(KrMS5 worlds rel val) = (KnS ps law obs, g) where
   law       = disSet [ booloutof (g w) ps | w <- worlds ]
   obs       = [ (i,newps i) | i<- ags ]
 
--- | BDD to say that exactly this subset of a given vocabulary is true.
--- Similar to `booloutofForm`.
-booloutof :: [Prp] -> [Prp] -> Bdd
-booloutof ps qs = conSet $
-  [ var n | (P n) <- ps ] ++
-  [ neg $ var n | (P n) <- qs \\ ps ]
-
 -- | Convert a multipointed S5 Kripke model to a knoweldge structure.
 -- See also `smartKripkeToKns`.
 kripkeToKnsMulti :: MultipointedModelS5 -> MultipointedKnowScene

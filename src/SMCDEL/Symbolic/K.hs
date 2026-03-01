@@ -59,8 +59,7 @@ import SMCDEL.Internal.Help (apply,lfp,powerset)
 import SMCDEL.Internal.TexDisplay
 import SMCDEL.Language
 import SMCDEL.Other.BDD2Form
-import SMCDEL.Symbolic.S5 (State,texBDD,boolBddOf,texBddWith,bddEval,relabelWith)
-import SMCDEL.Translations.S5 (booloutof)
+import SMCDEL.Symbolic.S5 (State,texBDD,boolBddOf,booloutof,texBddWith,bddEval,relabelWith)
 
 -- * Type-safe BDDs for Relations
 

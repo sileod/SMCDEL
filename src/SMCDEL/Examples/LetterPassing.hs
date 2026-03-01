@@ -15,7 +15,6 @@ import Data.List (sort)
 
 import SMCDEL.Language
 import SMCDEL.Symbolic.S5
-import SMCDEL.Translations.S5 (booloutof)
 import SMCDEL.Other.Planning
 
 -- * Formula helper functions

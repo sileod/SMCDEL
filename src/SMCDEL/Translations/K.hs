@@ -19,8 +19,7 @@ import SMCDEL.Explicit.S5 (worldsOf)
 import SMCDEL.Explicit.K
 import SMCDEL.Internal.Help (apply,powerset,groupSortWith)
 import SMCDEL.Symbolic.K
-import SMCDEL.Symbolic.S5 (boolBddOf)
-import SMCDEL.Translations.S5 (booloutof)
+import SMCDEL.Symbolic.S5 (boolBddOf,booloutof)
 import SMCDEL.Other.BDD2Form
 
 -- | Convert a belief scene to a pointed Kripke model.

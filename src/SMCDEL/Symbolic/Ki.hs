@@ -15,8 +15,7 @@ import Data.Map.Strict ((!))
 import SMCDEL.Internal.Help (apply,lfp,powerset)
 import SMCDEL.Language
 import SMCDEL.Other.BDD2Form
-import SMCDEL.Symbolic.S5 (State,boolBddOf,texBddWith,bddEval,relabelWith)
-import SMCDEL.Translations.S5 (booloutof)
+import SMCDEL.Symbolic.S5 (State,boolBddOf,booloutof,texBddWith,bddEval,relabelWith)
 
 mvP, cpP :: Int -> Prp -> Prp
 mvP m (P n) = P ((2*n) +m)     -- represent p  in the double vocabulary
