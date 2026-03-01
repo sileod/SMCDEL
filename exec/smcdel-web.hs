@@ -59,7 +59,7 @@ main = do
               webError Sanity Nothing msgs
             [] -> do
               let mykns = KnS (map P vocabInts) (boolBddOf lawform) (map (second (map P)) obs)
-              knstring <- liftIO $ showStructure mykns
+              knstring <- liftIO $ showStructure (Just "\\mathcal{F}") mykns
               results <- liftIO $ doJobsWebSafe mykns jobs
               html $ mconcat
                 [ TL.pack knstring
@@ -76,11 +76,11 @@ main = do
             [] -> do
               unless (null (sanityCheck ci)) (webError Sanity Nothing (sanityCheck ci))
               let mykns = KnS (map P vocabInts) (boolBddOf lawform) (map (second (map P)) obs)
-              _ <- liftIO $ showStructure mykns -- this moves parse errors to scotty
+              _ <- liftIO $ showStructure Nothing mykns -- this moves parse errors to scotty
               if numberOfStates mykns > 32
                 then html . TL.pack $ "Sorry, I will not draw " ++ show (numberOfStates mykns) ++ " states!"
                 else do
-                  let (myKripke, _) = knsToKripke (mykns, head $ statesOf mykns) -- ignore actual world
+                  let (myKripke, _) = knsToKripke (pointDef mykns :: KnowScene) -- ignore actual world
                   html $ TL.concat
                     [ TL.pack "<div id='here'></div>"
                     , TL.pack "<script>document.getElementById('here').innerHTML += Viz('"
@@ -129,22 +129,23 @@ doJobWeb mykns (UpdateQ f) = do
   let updatedKns = update mykns f
   let phiTex = texForm (simplify f)
   let fPhi = "\\( \\mathcal{F}^{(" ++ phiTex ++ ")} \\)"
-  updatedStruct <- showStructure updatedKns
+  updatedStruct <- showStructure Nothing updatedKns
   return (unlines
-      ["After updating the model with the new announcement \\(" ++ phiTex ++ "\\),"
-      , "the resulting structure is: " ++ fPhi ++ "<br />"
+      ["After updating with \\(" ++ phiTex ++ "\\),"
+      , "the new structure is: <br />"
       , updatedStruct
       ], updatedKns)
 
-showStructure :: KnowStruct -> IO String
-showStructure (KnS props lawbdd obs) = do
+showStructure :: Maybe String -> KnowStruct -> IO String
+showStructure sname (KnS props lawbdd obs) = do
   svgString <- svgGraph lawbdd
-  return $ "<div>$$ \\mathcal{F} = \\left( \n"
-    ++ tex props ++ ", "
+
+  return $ "<div>$$ " ++ maybe "" (++ " = ") sname ++ " \\left( \n"
+    ++ tex props ++ ", \\ "
     ++ " \\begin{array}{l} {"++ " \\href{javascript:void(0);}{\\theta} " ++"} \\end{array}\n "
-    ++ ", \\begin{array}{l}\n"
-    ++ intercalate " \\\\\n " (map (\(i,os) -> "O_{"++i++"}=" ++ tex os) obs)
-    ++ "\\end{array}\n"
+    ++ ", \\ \\begin{array}{l}\n"
+    ++ intercalate " \\\\\n " (map (\(i,os) -> "O_{"++i++"} = " ++ tex os) obs)
+    ++ "\\end{array}\\ \n"
     ++ " \\right) $$ \n <div class='lawbdd' style='display:none;'> where \\(\\theta\\) is this BDD:<br /><p align='center'>" ++ svgString ++ "</p></div></div>"
 
 embeddedFile :: String -> T.Text

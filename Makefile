@@ -30,4 +30,7 @@ static/ace.js:
 	rm -rf static/ace-builds-$(ACEVERSION)
 	rm static/ace.tgz
 
+web-live-reload:
+	stack build --flag smcdel:web --file-watch --exec "bash -c \"pkill smcdel-web; stack exec smcdel-web &\""
+
 .PHONY: default testcoverage clean release todo

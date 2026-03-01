@@ -92,7 +92,7 @@ OBS ...
 
 The second part of the input then consists of any number of *queries*, each using one of the three keywords:
 
-- `VALID?` followed by a formula will check whether the formula is valid in the structure, i.e. true at all states.
+- `VALID?` followed by a formula will check whether the formula is valid in the current structure, i.e. true at all states.
 
   Example: `VALID? alice knows that 0`.
 
@@ -103,6 +103,11 @@ The second part of the input then consists of any number of *queries*, each usin
 - `TRUE?` followed by a state and a formula will check if the formula is true at that state.
 
   Example: `TRUE? {0,1} alice knows that 0`
+
+- `UPDATE!` followed by a formula will update the current structure with a public announcement.
+  All later queries will use the new structure.
+
+  Example: `UPDATE! bob knows that alice know whether 1`.
 
 The syntax for formulas is defined in `src/SMCDEL/Internal/Lex.x` and `src/SMCDEL/Internal/Parse.y`. 
 

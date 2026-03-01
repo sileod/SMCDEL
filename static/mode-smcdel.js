@@ -19,7 +19,7 @@ define('ace/mode/smcdel_highlight_rules', function(require, exports, module) {
     var TextHighlightRules = require("ace/mode/text_highlight_rules").TextHighlightRules;
     var SmcdelHighlightRules =  function() {
         var keywords = "VARS|LAW|OBS|VALID|WHERE|TRUE|UPDATE"; // TODO: how to include "?"
-        var builtinConstants = "AND|OR|ONEOF|Top|knows|that|whether|comknow|";
+        var builtinConstants = "AND|OR|ONEOF|Top|knows|that|whether|comknow|distknow|";
         var builtinFunctions = ""; // unused
         var keywordMapper = this.createKeywordMapper({
             "support.function": builtinFunctions,
