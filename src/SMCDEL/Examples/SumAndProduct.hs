@@ -79,7 +79,7 @@ The following four functions allow us to say that a variable has a given value.
 For example:
 
 >>> xIs 5
-Conj [PrpF (P 1),PrpF (P 2),PrpF (P 3),PrpF (P 4),PrpF (P 6),Neg (PrpF (P 5)),Neg (PrpF (P 7))]
+Conj [PrpF (P 1),PrpF (P 2),PrpF (P 3),PrpF (P 4),Neg (PrpF (P 5)),PrpF (P 6),Neg (PrpF (P 7))]
 -}
 
 xIs, yIs, sIs, pIs :: Int -> Form

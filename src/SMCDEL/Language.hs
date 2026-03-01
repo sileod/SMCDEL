@@ -148,7 +148,7 @@ pubAnnounceWhetherStack = flip $ foldr pubAnnounceW
 
 -- | Abbreviation to say that exactly a given subset of a set of propositions is true.
 booloutofForm :: [Prp] -> [Prp] -> Form
-booloutofForm ps qs = Conj $ [ PrpF p | p <- ps ] ++ [ Neg $ PrpF r | r <- qs \\ ps ]
+booloutofForm ps qs = Conj [ (if p `elem` ps then id else Neg) (PrpF p) | p <- qs ]
 
 -- | Exactly one formula in the given list is true.
 oneOf :: [Form] -> Form
