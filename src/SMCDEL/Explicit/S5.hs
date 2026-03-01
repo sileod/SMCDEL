@@ -80,8 +80,19 @@ data KripkeModelS5 = KrMS5 [World]               -- ^ set of worlds
 instance Pointed KripkeModelS5 World
 type PointedModelS5 = (KripkeModelS5,World)
 
+instance DefaultPoint KripkeModelS5 World where
+  pointDef m = case worldsOf m of
+    [] -> error "Given KripkeModelS5 has no worlds."
+    (w : _) -> (m, w)
+
 instance Pointed KripkeModelS5 [World]
 type MultipointedModelS5 = (KripkeModelS5,[World])
+
+instance ToMulti PointedModelS5 MultipointedModelS5 where
+  toMulti (m, w) = (m, [w])
+
+instance DefaultPoint KripkeModelS5 [World] where
+  pointDef kns = toMulti (pointDef kns :: PointedModelS5)
 
 instance HasAgents KripkeModelS5 where
   agentsOf (KrMS5 _ rel _) = map fst rel

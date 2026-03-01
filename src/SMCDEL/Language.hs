@@ -169,17 +169,12 @@ instance Show DynamicOp where
 box :: DynamicOp -> Form -> Form
 box op f = Neg (Dia op (Neg f))
 
+-- * Type classes
 
--- * Typeclasses for Semantics
+-- ** Type Classes for Semantics
 
 class HasAgents a where
   agentsOf :: a -> [Agent]
-
-class Pointed a b
-
-instance (HasVocab a, Pointed a b) => HasVocab (a,b) where vocabOf = vocabOf . fst
-
-instance (HasAgents a, Pointed a b) => HasAgents (a,b) where agentsOf = agentsOf . fst
 
 class HasVocab a => Semantics a where
   isTrue :: a -> Form -> Bool
@@ -188,10 +183,24 @@ class HasVocab a => Semantics a where
 (|=) :: Semantics a => a -> Form -> Bool
 (|=) = isTrue
 
+-- ** Type Classes for Pointed Models and Structures
+
+class Pointed a b
+
+class DefaultPoint a b where
+  pointDef :: a -> (a,b)
+
+instance (HasVocab a, Pointed a b) => HasVocab (a,b) where vocabOf = vocabOf . fst
+
+instance (HasAgents a, Pointed a b) => HasAgents (a,b) where agentsOf = agentsOf . fst
+
+class ToMulti a b where
+  toMulti :: a -> b
+
 class Optimizable a where
   optimize :: [Prp] -> a -> a
 
--- * Type classes for Updates
+-- ** Type Classes for Updates
 
 class HasPrecondition a where
   preOf :: a -> Form

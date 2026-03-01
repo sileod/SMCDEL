@@ -64,18 +64,18 @@ main = hspec $ do
     prop "optimize preserves global truth" $
       \kns f -> isTrue (kns :: KnowStruct) f === isTrue (optimize defaultVocabulary kns) f
     prop "optimize preserves truth (without global modality)" $
-      \kns f -> let scene = (kns :: KnowStruct, head $ statesOf kns)
+      \kns f -> let scene = (pointDef kns :: KnowScene)
                 in not (containsGlobal f) ==> isTrue scene f === isTrue (optimize defaultVocabulary scene) f
     prop "generatedSubstructure preserves truth (without global modality)" $
-      \kns f -> let scene = (kns :: KnowStruct, booloutof (head $ statesOf kns) (vocabOf kns) )
-                in not (containsGlobal f) ==> isTrue scene f === isTrue (generatedSubstructure scene) f
+      \kns f -> let mscene = (toMulti (pointDef kns :: KnowScene) :: MultipointedKnowScene)
+                in not (containsGlobal f) ==> isTrue mscene f === isTrue (generatedSubstructure mscene) f
     modifyMaxSuccess (const 1000) $ prop "optimize can reduce the vocabulary" $
       expectFailure (\kns -> length (vocabOf (kns :: KnowStruct)) == length (vocabOf (optimize defaultVocabulary kns)))
     describe "some S5 validities" $ do
-      prop "Ck ags f --> f" $ \kns (Group ags) f -> evalViaBdd (kns, head (statesOf kns)) (Ck ags f `Impl` f)
-      prop "Dk ags f --> f" $ \kns (Group ags) f -> evalViaBdd (kns, head (statesOf kns)) (Ck ags f `Impl` f)
-      prop "K i f --> f" $ \kns (Ag i) f -> evalViaBdd (kns, head (statesOf kns)) (K i f `Impl` f)
-      prop "K i f --> K i (K i f)" $ \kns (Ag i) f -> evalViaBdd (kns, head (statesOf kns)) (K i f `Impl` K i (K i f))
+      prop "Ck ags f --> f" $ \kns (Group ags) f -> evalViaBdd (pointDef kns) (Ck ags f `Impl` f)
+      prop "Dk ags f --> f" $ \kns (Group ags) f -> evalViaBdd (pointDef kns) (Ck ags f `Impl` f)
+      prop "K i f --> f" $ \kns (Ag i) f -> evalViaBdd (pointDef kns) (K i f `Impl` f)
+      prop "K i f --> K i (K i f)" $ \kns (Ag i) f -> evalViaBdd (pointDef kns) (K i f `Impl` K i (K i f))
   describe "SMCDEL.Other.BDD2Form" $ do
     prop "boolBddOf . formOf == id" $
       \b -> b === boolBddOf (formOf b)
@@ -83,13 +83,13 @@ main = hspec $ do
       \(BF bf) -> boolBddOf (Equi bf (formOf (boolBddOf bf))) === boolBddOf Top
   describe "SMCDEL.Explicit.S5" $ modifyMaxSuccess (const 1000) $ do
     prop "generatedSubmodel preserves truth (without global modality)" $
-      \m f -> let pm = (m::Exp.KripkeModelS5, head $ Exp.worldsOf m)
+      \m f -> let pm = (pointDef m :: Exp.PointedModelS5)
               in not (containsGlobal f) ==> isTrue pm f === isTrue (Exp.generatedSubmodel pm) f
     prop "optimize preserves truth (without global modality)" $
-      \m f -> let pm = (m::Exp.KripkeModelS5, head $ Exp.worldsOf m)
+      \m f -> let pm = (pointDef m :: Exp.PointedModelS5)
               in not (containsGlobal f) ==> isTrue pm f === isTrue (optimize (vocabOf m) pm) f
     prop "optimize can shrink the model" $
-      expectFailure (\m -> let pm = (m::Exp.KripkeModelS5, head $ Exp.worldsOf m)
+      expectFailure (\m -> let pm = (pointDef m :: Exp.PointedModelS5)
                            in length (Exp.worldsOf pm) <= length (Exp.worldsOf (optimize (vocabOf m) pm)) )
     describe "Dk properties" $ do
       prop "Ck i <-> Dk i" $ \(Ag i) krm f -> Exp.eval (krm,0) (Ck [i] f `Equi` Dk [i] f)
@@ -135,8 +135,8 @@ main = hspec $ do
     describe "SMCDEL.Examples.DoorMat" $ do
       it "tryTake reaches the goal" $
         reachesOn (Do "tryTake" tryTake (Check dmGoal Stop)) dmGoal dmStart
-      it "the plan found with 'findPlan 3' works" $
-        reachesOn (head $ findPlan 3 dm) dmGoal dmStart
+      it "The first plan found with 'findPlan 3' works" $
+        all (\ p -> reachesOn p dmGoal dmStart) (take 1 $ findPlan 3 dm)
       it "tryTake is not an IC plan" $
         not $ [("Bob",tryTakeL)] `icSolves` dmCoop
       it "dmPlan2 `icSolves` dmCoop2" $
@@ -154,8 +154,8 @@ main = hspec $ do
         length (filter checkSet allHandLists) === 102
       it "rusSCNfor (3,3,1) == rusSCN" $
         rusSCNfor (3,3,1) === rusSCN
-      it "head rcSolutionsViaPlanning == head rcSolutions" $
-        head rcSolutionsViaPlanning === head rcSolutions
+      it "take 1 rcSolutionsViaPlanning == take 1 rcSolutions" $
+        take 1 rcSolutionsViaPlanning === take 1 rcSolutions
       it "reachesOn rcPlan rcGoal rusSCN" $
         reachesOn rcPlan rcGoal rusSCN
     it "Sum and Product: There is exactly one solution." $
@@ -169,7 +169,7 @@ main = hspec $ do
     it "What Sum: There are 2 solutions (assuming bound 10)." $
       length SMCDEL.Examples.WhatSum.wsSolutions === 2
     it "What Sum: The first solution is [('a',1),('b',3),('c',2)]" $
-      wsExplainState (head wsSolutions) `shouldBe` [('a',1),('b',3),('c',2)]
+      map wsExplainState (take 1 wsSolutions) `shouldBe` [[('a',1),('b',3),('c',2)]]
   let ags = agentsOf myMudGenKrpInit
   describe "SMCDEL.Explicit.K" $ do
     it "3MC genKrp: Top is Ck and Bot is not Ck" $

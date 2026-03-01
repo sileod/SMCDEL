@@ -99,8 +99,21 @@ instance Pointed KnowStruct State
 -- | A pair \((\mathcal{F},s)\) where \(s\) is a state of \(\mathcal{F}\), is a /scene/.
 type KnowScene = (KnowStruct,State)
 
+instance DefaultPoint KnowStruct State where
+  pointDef kns = case statesOf kns of
+    [] -> error "Given KnowStruct has no states."
+    (s : _) -> (kns, s)
+
 instance Pointed KnowStruct Bdd
+
+-- | A pair \((\mathcal{F}, \beta)\) where \(\beta\) is a BDD, is a /multipointed scene/.
 type MultipointedKnowScene = (KnowStruct,Bdd)
+
+instance ToMulti KnowScene MultipointedKnowScene where
+  toMulti (kns, s) = (kns :: KnowStruct, booloutof s (vocabOf kns))
+
+instance DefaultPoint KnowStruct Bdd where
+  pointDef kns = toMulti (pointDef kns :: KnowScene)
 
 -- | Given a knowledge structure, generate the finite list of its states.
 statesOf :: KnowStruct -> [State]
