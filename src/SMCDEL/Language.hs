@@ -108,8 +108,8 @@ data Form
   | Bot                         -- ^ False Constant
   | PrpF Prp                    -- ^ Atomic Proposition
   | Neg Form                    -- ^ Negation
-  | Conj [Form]                 -- ^ Conjunction
-  | Disj [Form]                 -- ^ Disjunction
+  | Conj [Form]                 -- ^ n-ary Conjunction
+  | Disj [Form]                 -- ^ n-ary Disjunction
   | Xor [Form]                  -- ^ n-ary X-OR
   | Impl Form Form              -- ^ Implication
   | Equi Form Form              -- ^ Bi-Implication
@@ -128,9 +128,21 @@ data Form
 
 -- * Abbreviations
 
+-- | Binary conjunction
+conj :: Form -> Form -> Form
+conj f g = Conj [f, g]
+
+-- | Binary disjunction
+disj :: Form -> Form -> Form
+disj f g = Disj [f, g]
+
 -- | If-Then-Else
 ite :: Form -> Form -> Form -> Form
 ite f g h = Conj [f `Impl` g, Neg f `Impl` h]
+
+-- | The epistemic diamond operator "considers possible that".
+kHat :: Agent -> Form -> Form
+kHat i f = Neg (K i (Neg f))
 
 -- | Sequence of public announcements.
 pubAnnounceStack :: [Form] -> Form -> Form
