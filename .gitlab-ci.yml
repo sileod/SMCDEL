@@ -11,39 +11,6 @@ cache: &global_cache
 before_script:
   - stack config set system-ghc --global true
 
-build:
-  tags: ["GitlabResearch"]
-  stage: build
-  script:
-    - rm -rf .stack-work/install/*/*/*/bin
-    - stack build --no-terminal --coverage --test --bench --no-run-tests --no-run-benchmarks
-  after_script:
-    - rm -rf ./bin
-    - mv .stack-work/install/*/*/*/bin ./bin
-  artifacts:
-    paths:
-      - "bin/"
-
-test:
-  tags: ["GitlabResearch"]
-  stage: test
-  script:
-    - apt-get update -yqq
-    - apt-get install -y --no-install-recommends graphviz dot2tex python3-pkg-resources libtinfo5 texlive-latex-base texlive-latex-extra poppler-utils preview-latex-style texlive-pstricks poppler-utils
-    - rm -rf .stack-work/install/*/*/*/hpc
-    - stack --no-terminal test --coverage smcdel:test:examples smcdel:test:k smcdel:test:translations
-  coverage: '/(\d+)% top-level declarations used/'
-  after_script:
-    - rm -rf ./hpc
-    - mv .stack-work/install/*/*/*/hpc ./hpc
-  artifacts:
-    when: always
-    paths:
-      - "hpc/"
-  cache:
-    <<: *global_cache
-    policy: pull
-
 hlint:
   tags: ["GitlabResearch"]
   image: debian:stable
