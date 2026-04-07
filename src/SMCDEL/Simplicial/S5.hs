@@ -40,14 +40,16 @@ eval sm facet (Impl f g)    = not (eval sm facet f) || eval sm facet g
 eval sm facet (Equi f g)    = eval sm facet f == eval sm facet g
 eval sm facet (K ag form) = all (\x -> eval sm x form) facets where
     facets = getRelFacets sm facet ag
-eval _ _ (Forall _ _) = undefined
-eval _ _ (Exists _ _) = undefined
+eval sm facets (Forall ps f) = eval sm facets (foldl singleForall f ps) where
+  singleForall g p = Conj [ substit p Top g, substit p Bot g ]
+eval sm facets (Exists ps f) = eval sm facets (foldl singleExists f ps) where
+  singleExists g p = Disj [ substit p Top g, substit p Bot g ]
 eval _ _ (Ck _ _) = undefined
 eval _ _ (Dk _ _) = undefined
-eval _ _ (Kw _ _) = undefined
+eval sm facet (Kw ag form) = eval sm facet (K ag form) || eval sm facet (K ag (Neg form))
 eval _ _ (Ckw _ _) = undefined
 eval _ _ (Dkw _ _) = undefined
-eval _ _ (G _) = undefined
+eval (SMS5 facets col val) _ (G form) = all (\x -> eval (SMS5 facets col val) x (G form)) facets
 eval _ _ (PubAnnounce _ _) = undefined
 eval _ _ (Dia _ _) = undefined
 
@@ -57,3 +59,11 @@ eval _ _ (Dia _ _) = undefined
 -- Fig. 4 from proposal
 exampleSM :: SimplicialModelS5
 exampleSM = SMS5 [[1, 2, 3], [2, 3, 4]] [(1, "a"), (2, "b"), (3, "c"), (4, "a")] [(1, [P 1]), (2, [P 2]), (3, []), (4, [])]
+
+{-
+>>> eval exampleSM [1, 2, 3] (K "a" (PrpF (P 1)))
+True
+
+>>> eval exampleSM [1, 2, 3] (K "b" (PrpF (P 1)))
+False
+-}
