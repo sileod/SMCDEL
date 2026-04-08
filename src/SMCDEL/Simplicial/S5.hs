@@ -1,7 +1,6 @@
 module SMCDEL.Simplicial.S5 where
 
-import Data.List (intersect)
-import Data.Maybe
+import Data.List (intersect, nub)
 import qualified Data.Map.Strict as M
 
 import SMCDEL.Language
@@ -9,8 +8,11 @@ import SMCDEL.Language
 -- | A vertex is represented by an integer
 type Vert = Int
 
--- | A simplicial complex is represented by a list of facets where each facet is a list of vertices
-type SimplicialComplex = [[Vert]]
+-- | A facet is a list of vertices
+type Facet = [Vert]
+
+-- | A simplicial complex is represented by a list of facets
+type SimplicialComplex = [Facet]
 
 -- | The colouring function Chi is represented by a map from vertices to agents
 type Colours = M.Map Vert Agent
@@ -19,6 +21,27 @@ type Colours = M.Map Vert Agent
 type Valuation = M.Map Vert (M.Map Prp Bool)
 
 data SimplicialModelS5 = SMS5 SimplicialComplex Colours Valuation deriving (Eq, Show)
+
+class HasFacets a where
+    facetsOf :: a -> [Facet]
+
+instance HasFacets SimplicialModelS5 where
+    facetsOf (SMS5 sc _ _) = sc
+
+instance HasVocab SimplicialModelS5 where
+   vocabOf (SMS5 _ _ val) = nub ((concatMap M.keys . M.elems) val)
+
+instance HasAgents SimplicialModelS5 where
+    agentsOf (SMS5 _ col _) = nub (M.elems col)
+
+instance Semantics SimplicialModelS5 where
+    isTrue sm form = all (\x -> eval sm x form) (facetsOf sm)
+
+-- instance Pointed SimplicialModelS5 Facet where
+-- type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
+
+-- instance Semantics PointedSimplicialModelS5 where
+--     isTrue (sm, facet) = eval sm facet 
 
 -- | Get a list of variables that are true in a given vertex
 getLocalVar :: Valuation -> Vert -> [Prp]
@@ -32,7 +55,7 @@ getGlobalVar val = concatMap (getLocalVar val)
 
 -- | Get a list of all neighbouring facets where all given agents sit at an intersection  
 getRelFacets :: SimplicialModelS5 -> [Vert] -> [Agent] -> [[Vert]]
-getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` mapMaybe (`M.lookup` col) (facet `intersect` x)) == ags) sc
+getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` map (col M.!) (facet `intersect` x)) == ags) sc
 
 eval :: SimplicialModelS5 -> [Vert] -> Form -> Bool
 eval _ _ Top = True
@@ -65,9 +88,9 @@ eval _ _ (Dia _ _) = undefined
 
 -- Fig. 4 from proposal
 exampleSM :: SimplicialModelS5
-exampleSM = SMS5 
-    [[1, 2, 3], [2, 3, 4]] 
-    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")]) 
+exampleSM = SMS5
+    [[1, 2, 3], [2, 3, 4]]
+    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")])
     (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
 
 {-
