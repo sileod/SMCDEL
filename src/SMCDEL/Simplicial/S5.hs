@@ -2,32 +2,37 @@ module SMCDEL.Simplicial.S5 where
 
 import Data.List (intersect)
 import Data.Maybe
+import qualified Data.Map.Strict as M
+
 import SMCDEL.Language
 
--- a vertex is represented by an integer
+-- | A vertex is represented by an integer
 type Vert = Int
 
-type SimplicialComplex = [[Vert]] -- include only facets
+-- | A simplicial complex is represented by a list of facets where each facet is a list of vertices
+type SimplicialComplex = [[Vert]]
 
-type Colours = [(Vert, Agent)]
+-- | The colouring function Chi is represented by a map from vertices to agents
+type Colours = M.Map Vert Agent
 
-type Valuation = [(Vert, [Prp])]
+-- | A valuation is a map from vertices to explicit assignments (maps from propositions to Booleans)
+type Valuation = M.Map Vert (M.Map Prp Bool)
 
 data SimplicialModelS5 = SMS5 SimplicialComplex Colours Valuation deriving (Eq, Show)
 
--- returns a list of variables that are true in a given vertex
+-- | Get a list of variables that are true in a given vertex
 getLocalVar :: Valuation -> Vert -> [Prp]
-getLocalVar val vert = case lookup vert val of
+getLocalVar val vert = case M.lookup vert val of
     Nothing -> error "vertex not in SC"
-    Just props -> props
+    Just assigns -> (M.keys . M.filter id) assigns
 
--- returns a list of variables that are true in a given facet
+-- | Get a list of variables that are true in a given facet
 getGlobalVar :: Valuation -> [Vert] -> [Prp]
 getGlobalVar val = concatMap (getLocalVar val)
 
--- returns a list of all neighbouring facets where all given agents sit at an intersection  
+-- | Get a list of all neighbouring facets where all given agents sit at an intersection  
 getRelFacets :: SimplicialModelS5 -> [Vert] -> [Agent] -> [[Vert]]
-getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` mapMaybe (`lookup` col) (facet `intersect` x)) == ags) sc
+getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` mapMaybe (`M.lookup` col) (facet `intersect` x)) == ags) sc
 
 eval :: SimplicialModelS5 -> [Vert] -> Form -> Bool
 eval _ _ Top = True
@@ -50,7 +55,7 @@ eval sm facet (Dk ags form) = all (\x -> eval sm x form) facets where
     facets = getRelFacets sm facet ags
 eval sm facet (Kw ag form) = eval sm facet (K ag form) || eval sm facet (K ag (Neg form))
 eval _ _ (Ckw _ _) = undefined
-eval sm facet (Dkw ags form) = eval sm facet (Dk ags form) || eval sm facet (Dk ags (Neg form)) 
+eval sm facet (Dkw ags form) = eval sm facet (Dk ags form) || eval sm facet (Dk ags (Neg form))
 eval (SMS5 facets col val) _ (G form) = all (\x -> eval (SMS5 facets col val) x (G form)) facets
 eval _ _ (PubAnnounce _ _) = undefined
 eval _ _ (Dia _ _) = undefined
@@ -60,7 +65,10 @@ eval _ _ (Dia _ _) = undefined
 
 -- Fig. 4 from proposal
 exampleSM :: SimplicialModelS5
-exampleSM = SMS5 [[1, 2, 3], [2, 3, 4]] [(1, "a"), (2, "b"), (3, "c"), (4, "a")] [(1, [P 1]), (2, [P 2]), (3, []), (4, [])]
+exampleSM = SMS5 
+    [[1, 2, 3], [2, 3, 4]] 
+    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")]) 
+    (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
 
 {-
 >>> eval exampleSM [1, 2, 3] (K "a" (PrpF (P 1)))
