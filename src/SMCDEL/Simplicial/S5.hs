@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
+
 module SMCDEL.Simplicial.S5 where
 
 import Data.List (intersect, nub)
@@ -25,6 +27,9 @@ data SimplicialModelS5 = SMS5 SimplicialComplex Colours Valuation deriving (Eq, 
 class HasFacets a where
     facetsOf :: a -> [Facet]
 
+instance HasFacets SimplicialComplex where
+    facetsOf sc = sc
+
 instance HasFacets SimplicialModelS5 where
     facetsOf (SMS5 sc _ _) = sc
 
@@ -35,13 +40,13 @@ instance HasAgents SimplicialModelS5 where
     agentsOf (SMS5 _ col _) = nub (M.elems col)
 
 instance Semantics SimplicialModelS5 where
-    isTrue sm form = all (\x -> eval sm x form) (facetsOf sm)
+    isTrue sm form = all (\x -> eval (sm, x) form) (facetsOf sm)
 
--- instance Pointed SimplicialModelS5 Facet where
--- type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
+instance Pointed SimplicialModelS5 Facet where
+type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
 
--- instance Semantics PointedSimplicialModelS5 where
---     isTrue (sm, facet) = eval sm facet 
+instance Semantics PointedSimplicialModelS5 where
+    isTrue (sm, facet) = eval (sm, facet)
 
 -- | Get a list of variables that are true in a given vertex
 getLocalVar :: Valuation -> Vert -> [Prp]
@@ -57,31 +62,31 @@ getGlobalVar val = concatMap (getLocalVar val)
 getRelFacets :: SimplicialModelS5 -> [Vert] -> [Agent] -> [[Vert]]
 getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` map (col M.!) (facet `intersect` x)) == ags) sc
 
-eval :: SimplicialModelS5 -> [Vert] -> Form -> Bool
-eval _ _ Top = True
-eval _ _ Bot = False
-eval (SMS5 _ _ val) facet (PrpF p) = p `elem` getGlobalVar val facet
-eval sm facet (Neg form) = not $ eval sm facet form
-eval sm facet (Conj forms)  = all (eval sm facet) forms
-eval sm facet (Disj forms)  = any (eval sm facet) forms
-eval sm facet (Xor  forms)  = odd $ length (filter id $ map (eval sm facet) forms)
-eval sm facet (Impl f g)    = not (eval sm facet f) || eval sm facet g
-eval sm facet (Equi f g)    = eval sm facet f == eval sm facet g
-eval sm facet (K ag form) = all (\x -> eval sm x form) facets where
+eval :: PointedSimplicialModelS5 -> Form -> Bool
+eval _ Top = True
+eval _ Bot = False
+eval (SMS5 _ _ val, facet) (PrpF p) = p `elem` getGlobalVar val facet
+eval pm (Neg form) = not $ eval pm form
+eval pm (Conj forms)  = all (eval pm) forms
+eval pm (Disj forms)  = any (eval pm) forms
+eval pm (Xor  forms)  = odd $ length (filter id $ map (eval pm) forms)
+eval pm (Impl f g)    = not (eval pm f) || eval pm g
+eval pm (Equi f g)    = eval pm f == eval pm g
+eval (sm, facet) (K ag form) = all (\x -> eval (sm, x) form) facets where
     facets = getRelFacets sm facet [ag]
-eval sm facets (Forall ps f) = eval sm facets (foldl singleForall f ps) where
+eval pm (Forall ps f) = eval pm (foldl singleForall f ps) where
   singleForall g p = Conj [ substit p Top g, substit p Bot g ]
-eval sm facets (Exists ps f) = eval sm facets (foldl singleExists f ps) where
+eval pm (Exists ps f) = eval pm (foldl singleExists f ps) where
   singleExists g p = Disj [ substit p Top g, substit p Bot g ]
-eval _ _ (Ck _ _) = undefined
-eval sm facet (Dk ags form) = all (\x -> eval sm x form) facets where
+eval _ (Ck _ _) = undefined
+eval (sm, facet) (Dk ags form) = all (\x -> eval (sm, x) form) facets where
     facets = getRelFacets sm facet ags
-eval sm facet (Kw ag form) = eval sm facet (K ag form) || eval sm facet (K ag (Neg form))
-eval _ _ (Ckw _ _) = undefined
-eval sm facet (Dkw ags form) = eval sm facet (Dk ags form) || eval sm facet (Dk ags (Neg form))
-eval (SMS5 facets col val) _ (G form) = all (\x -> eval (SMS5 facets col val) x (G form)) facets
-eval _ _ (PubAnnounce _ _) = undefined
-eval _ _ (Dia _ _) = undefined
+eval pm (Kw ag form) = eval pm (K ag form) || eval pm (K ag (Neg form))
+eval _ (Ckw _ _) = undefined
+eval pm (Dkw ags form) = eval pm (Dk ags form) || eval pm (Dk ags (Neg form))
+eval (sm, _) (G form) = all (\x -> eval (sm, x) (G form)) (facetsOf sm)
+eval _ (PubAnnounce _ _) = undefined
+eval _ (Dia _ _) = undefined
 
 
 -- Examples
@@ -94,18 +99,18 @@ exampleSM = SMS5
     (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
 
 {-
->>> eval exampleSM [1, 2, 3] (K "a" (PrpF (P 1)))
+>>> eval (exampleSM, [1, 2, 3]) (K "a" (PrpF (P 1)))
 True
 
->>> eval exampleSM [1, 2, 3] (K "b" (PrpF (P 1)))
+>>> eval (exampleSM, [1, 2, 3]) (K "b" (PrpF (P 1)))
 False
 
->>> eval exampleSM [1, 2, 3] (Dk ["b", "c"] (conj (PrpF (P 1)) (PrpF (P 2))))
+>>> eval (exampleSM, [1, 2, 3]) (Dk ["b", "c"] (conj (PrpF (P 1)) (PrpF (P 2))))
 False
 
->>> eval exampleSM [1, 2, 3] (Dk ["b", "c"] (conj (PrpF (P 2)) (PrpF (P 3))))
+>>> eval (exampleSM, [1, 2, 3]) (Dk ["b", "c"] (conj (PrpF (P 2)) (PrpF (P 3))))
 False
 
->>> eval exampleSM [1, 2, 3] (Dk ["b", "c"] (conj (PrpF (P 2)) (Neg (PrpF (P 3)))))
+>>> eval (exampleSM, [1, 2, 3]) (Dk ["b", "c"] (conj (PrpF (P 2)) (Neg (PrpF (P 3)))))
 True
 -}
