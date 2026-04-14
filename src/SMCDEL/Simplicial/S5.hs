@@ -46,7 +46,7 @@ instance Pointed SimplicialModelS5 Facet where
 type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
 
 instance Semantics PointedSimplicialModelS5 where
-    isTrue (sm, facet) = eval (sm, facet)
+    isTrue = eval
 
 -- | Get a list of variables that are true in a given vertex
 getLocalVar :: Valuation -> Vert -> [Prp]
@@ -55,12 +55,21 @@ getLocalVar val vert = case M.lookup vert val of
     Just assigns -> (M.keys . M.filter id) assigns
 
 -- | Get a list of variables that are true in a given facet
-getGlobalVar :: Valuation -> [Vert] -> [Prp]
+getGlobalVar :: Valuation -> Facet -> [Prp]
 getGlobalVar val = concatMap (getLocalVar val)
 
 -- | Get a list of all neighbouring facets where all given agents sit at an intersection  
-getRelFacets :: SimplicialModelS5 -> [Vert] -> [Agent] -> [[Vert]]
+getRelFacets :: SimplicialModelS5 -> Facet -> [Agent] -> [Facet]
 getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` map (col M.!) (facet `intersect` x)) == ags) sc
+
+-- | Get a list of all facets where some agent sits at an intersection of any facet in the given list, closed
+getStarB :: SimplicialModelS5 -> [Facet] -> [Agent] -> [Facet]
+getStarB sm starBs ags
+    | singleStarB sm starBs ags == starBs = starBs -- no new facet added to starB
+    | otherwise = getStarB sm (singleStarB sm starBs ags) ags -- new facet(s) added to starB, check once again
+
+singleStarB :: SimplicialModelS5 -> [Facet] -> [Agent] -> [Facet]
+singleStarB (SMS5 sc col _) cur ags = filter (\x -> any (\y -> not (null (ags `intersect` map (col M.!) (y `intersect` x)))) cur) sc
 
 eval :: PointedSimplicialModelS5 -> Form -> Bool
 eval _ Top = True
@@ -78,13 +87,14 @@ eval pm (Forall ps f) = eval pm (foldl singleForall f ps) where
   singleForall g p = Conj [ substit p Top g, substit p Bot g ]
 eval pm (Exists ps f) = eval pm (foldl singleExists f ps) where
   singleExists g p = Disj [ substit p Top g, substit p Bot g ]
-eval _ (Ck _ _) = undefined
+eval (sm, cur) (Ck ags form) = all (\x -> eval (sm, x) form) facets where
+    facets = getStarB sm [cur] ags
 eval (sm, facet) (Dk ags form) = all (\x -> eval (sm, x) form) facets where
     facets = getRelFacets sm facet ags
 eval pm (Kw ag form) = eval pm (K ag form) || eval pm (K ag (Neg form))
-eval _ (Ckw _ _) = undefined
+eval pm (Ckw ag form) = eval pm (Ck ag form) || eval pm (Ck ag (Neg form))
 eval pm (Dkw ags form) = eval pm (Dk ags form) || eval pm (Dk ags (Neg form))
-eval (sm, _) (G form) = all (\x -> eval (sm, x) (G form)) (facetsOf sm)
+eval (sm, _) (G form) = isTrue sm form
 eval _ (PubAnnounce _ _) = undefined
 eval _ (Dia _ _) = undefined
 
@@ -97,6 +107,13 @@ exampleSM = SMS5
     [[1, 2, 3], [2, 3, 4]]
     (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")])
     (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
+
+-- C' from Example 22 in van Ditmarsch et al., 2022
+exampleSM2 :: SimplicialModelS5
+exampleSM2 = SMS5
+    [[1, 2, 3], [2, 3, 4], [3, 4, 5], [5, 6, 7], [6, 7, 8], [7, 8, 9]]
+    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a"), (5, "b"), (6, "a"), (7, "c"), (8, "b"), (9, "a")])
+    (M.fromList [(1, M.fromList [(P 1, False)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, True)]), (4, M.fromList [(P 1, True)]), (5, M.fromList [(P 2, False)]), (6, M.fromList [(P 1, True)]), (7, M.fromList [(P 3, False)]), (8, M.fromList [(P 2, True)]), (9, M.fromList [(P 1, False)])])
 
 {-
 >>> eval (exampleSM, [1, 2, 3]) (K "a" (PrpF (P 1)))
@@ -113,4 +130,7 @@ False
 
 >>> eval (exampleSM, [1, 2, 3]) (Dk ["b", "c"] (conj (PrpF (P 2)) (Neg (PrpF (P 3)))))
 True
+
+>>> eval (exampleSM2, [1, 2, 3]) (Ck ["a", "b", "c"] (PrpF (P 3)))
+False
 -}
