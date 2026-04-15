@@ -23,12 +23,14 @@ module SMCDEL.Translations.S5 where
 
 import Data.Containers.ListUtils (nubOrd)
 import Data.HasCacBDD hiding (Top,Bot)
-import Data.List (groupBy,sort,(\\),elemIndex,intersect)
-import Data.Maybe (listToMaybe,fromJust)
+import Data.List (groupBy,sort,(\\),elemIndex,intersect, union)
+import qualified Data.Map.Strict as M
+import Data.Maybe (listToMaybe,fromJust, mapMaybe)
 
 import SMCDEL.Language
 import SMCDEL.Symbolic.S5
 import SMCDEL.Explicit.S5
+import SMCDEL.Simplicial.S5
 import SMCDEL.Internal.Help (anydiffWith,alldiff,alleqWith,apply,powerset,(!),seteq,subseteq)
 import SMCDEL.Other.BDD2Form
 
@@ -370,3 +372,36 @@ actionToEventMulti :: MultipointedActionModelS5 -> MultipointedEvent
 actionToEventMulti (actm, curActions) = (trf, curActionsLaw) where
   (trf@(KnTrf addprops _ _ _), g) = actionToTransformerWithMap actm
   curActionsLaw = disSet [ booloutof (g w) addprops | w <- curActions ]
+
+-- * S5 Simplicial Models to S5 Kripke Models
+
+-- | Convert a simplicial model to a Kripke model
+simpToKripke :: SimplicialModelS5 -> KripkeModelS5
+simpToKripke sm = KrMS5 worlds rel val where
+  worlds = take (length (facetsOf sm)) [1..]
+  rel = [(ag, findPartition sm ag) | ag <- agentsOf sm]
+  val = [(world, findAssignment sm world) | world <- worlds]
+
+-- | Given a simplicial model and an agent, find the partition encoding the equivalence relations of this agent
+-- reverses order
+findPartition :: SimplicialModelS5 -> Agent -> Partition
+findPartition sm ag = findPartitionHelper sm ag []
+
+findPartitionHelper :: SimplicialModelS5 -> Agent -> [[World]] -> Partition
+findPartitionHelper sm ag eqClasses
+  | length (foldr union [] eqClasses) == length (facetsOf sm) = eqClasses -- all equivalence classes found
+  | otherwise = findPartitionHelper sm ag (findEquivalenceClass sm (head remainingWorlds) ag : eqClasses) where
+    remainingWorlds = facetsOf sm \\ map (worldToFacet sm) (foldr union [] eqClasses)
+
+-- | Given a simplicial model, a facet and an agent, find the corresponding equivalence class of worlds
+findEquivalenceClass :: SimplicialModelS5 -> Facet -> Agent -> [World]
+findEquivalenceClass sm x ag = map (+ 1) (mapMaybe (`elemIndex` facetsOf sm) (getRelFacets sm x [ag]))
+
+-- | Given a simplicial model and a world, find the corresponding facet in the simplicial model
+worldToFacet :: SimplicialModelS5 -> World -> Facet
+worldToFacet sm w = facetsOf sm !! (w - 1)
+
+-- | Given a simplicial model and a world, find the corresponding assignment
+-- does not necessarily preserve order
+findAssignment :: SimplicialModelS5 -> World -> SMCDEL.Explicit.S5.Assignment
+findAssignment sm@(SMS5 _ _ val) w = concatMap (M.toList . (val M.!)) (worldToFacet sm w)
