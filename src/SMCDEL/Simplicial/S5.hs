@@ -13,7 +13,7 @@ Based on definitions from:
 
 module SMCDEL.Simplicial.S5 where
 
-import Data.List (intersect, nub)
+import Data.List (intersect, nub, union)
 import qualified Data.Map.Strict as M
 
 import SMCDEL.Language
@@ -108,9 +108,18 @@ eval pm (Kw ag form) = eval pm (K ag form) || eval pm (K ag (Neg form))
 eval pm (Ckw ag form) = eval pm (Ck ag form) || eval pm (Ck ag (Neg form))
 eval pm (Dkw ags form) = eval pm (Dk ags form) || eval pm (Dk ags (Neg form))
 eval (sm, _) (G form) = isTrue sm form
-eval _ (PubAnnounce _ _) = undefined -- TODO
+eval pm (PubAnnounce form1 form2) = not (eval pm form1) || eval (update pm form1) form2 
 eval _ (Dia _ _) = undefined -- TODO
 
+instance Update SimplicialModelS5 Form where
+    unsafeUpdate sm@(SMS5 sc col val) form = SMS5 newsc newcol newval where
+        newsc = filter (\x -> eval (sm, x) form) sc
+        newcol = M.filterWithKey (\k _ -> k `elem` newvert) col
+        newval = M.filterWithKey (\k _ -> k `elem` newvert) val 
+        newvert = foldr union [] newsc
+
+instance Update PointedSimplicialModelS5 Form where
+    unsafeUpdate (sm, x) form = (unsafeUpdate sm form, x)
 
 -- Examples
 
@@ -135,21 +144,56 @@ exampleSM2 = SMS5
     (M.fromList [(1, M.fromList [(P 1, False)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, True)]), (4, M.fromList [(P 1, True)]), (5, M.fromList [(P 2, False)]), (6, M.fromList [(P 1, True)]), (7, M.fromList [(P 3, False)]), (8, M.fromList [(P 2, True)]), (9, M.fromList [(P 1, False)])])
 
 {-
+Some tests:
+
+In the simplicial model depicted in Fig. 4 in the proposal pointing towards 
+\(X\), it is true that \(a\) knows \(p_a\), since \(p_a\) is true in \(X\) and 
+only \(X\) is accessible for \(a\).
 >>> pointedExampleSM |= (K "a" (PrpF (P 1)))
 True
 
+It is not true however, that \(b\) knows \(p_a\), since \(p_a\) is not true in 
+\(Y\) and the facets \(X\) and \(Y\) are indistinguishable for \(b\).
 >>> pointedExampleSM |= (K "b" (PrpF (P 1)))
 False
 
+It is not true that the agents \(b\) and \(c\) distributedly know that 
+\(p_a \wedge p_b\), since \(p_a\) is true in \(X\) but not in \(Y\) and both
+\(X\) and \(Y\) are indistinguishable for both \(b\) and \(c\) (i.e. neither of 
+them knows that \(p_a\) is true).
 >>> pointedExampleSM |= (Dk ["b", "c"] (conj (PrpF (P 1)) (PrpF (P 2))))
 False
 
->>> pointedExampleSM |= (Dk ["b", "c"] (conj (PrpF (P 2)) (PrpF (P 3))))
-False
-
+However, they distributedly know that \(p_b \wedge \neg p_c\), since this 
+formula holds in both \(X\) and \(Y\).
 >>> pointedExampleSM |= (Dk ["b", "c"] (conj (PrpF (P 2)) (Neg (PrpF (P 3)))))
 True
 
+Furthermore, while \(b\) and \(c\) among each other do not, all agents 
+together distributedly know that \(p_a\) is true, since for \(a\), only \(X\) 
+(where \(p_a\) is true) is accessible.
+Distributed knowledge among all agents is trivial, since a formula is 
+distributedly known among all agents iff it is true in the current facet.
+>>> pointedExampleSM |= (Dk ["a", "b", "c"] (PrpF (P 1)))
+True
+
+Initially, it is not true that \(p_a\) is common knowledge (both \(b\) and \(c\)
+are uncertain about \(p_a\) since \(X\) and \(Y\) are related for agents \(b\) 
+and \(c\)) and \(p_a\) is true in \(X\) but false in \(Y\)).
+>>> eval pointedExampleSM (Ck ["a", "b", "c"] (PrpF (P 1)))
+False
+
+After publicly announcing that \(p_a\) is true, \(p_a\) is common knowledge 
+among all agents.
+>>> eval pointedExampleSM (PubAnnounce (PrpF (P 1)) (Ck ["a", "b", "c"] (PrpF (P 1))))
+True
+
+In \( \mathcal{C}'\) from Ex. 22 in [Dit+22], pointing towards \(X\), it is not 
+common knowledge among all agents that \(p_c\) is true, since \(b\) cannot 
+distinguish between the left part of the simplicial complex, where \(p_c\) is 
+true, and the right part of the complex, where \(p_3\) is false (formally: 
+\(p_c\) is not true in \(V\), but \(X\) and \(V\) are
+connected via \( c\in \chi(X\cap Z)\) and \( b\in \chi(Z\cap V) \)). 
 >>> eval (exampleSM2, [1, 2, 3]) (Ck ["a", "b", "c"] (PrpF (P 3)))
 False
 -}
