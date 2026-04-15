@@ -405,3 +405,7 @@ worldToFacet sm w = facetsOf sm !! (w - 1)
 -- does not necessarily preserve order
 findAssignment :: SimplicialModelS5 -> World -> SMCDEL.Explicit.S5.Assignment
 findAssignment sm@(SMS5 _ _ val) w = concatMap (M.toList . (val M.!)) (worldToFacet sm w)
+
+-- | Convert a pointed simplicial model to a pointed Kripke model
+simpToKripkePointed :: PointedSimplicialModelS5 -> PointedModelS5
+simpToKripkePointed (sm, x) = (simpToKripke sm, fromJust (elemIndex x (facetsOf sm)) + 1)
