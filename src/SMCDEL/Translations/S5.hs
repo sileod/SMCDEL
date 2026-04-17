@@ -23,7 +23,7 @@ module SMCDEL.Translations.S5 where
 
 import Data.Containers.ListUtils (nubOrd)
 import Data.HasCacBDD hiding (Top,Bot)
-import Data.List (groupBy,sort,(\\),elemIndex,intersect, union)
+import Data.List (groupBy,sort,(\\),elemIndex,intersect, union,find)
 import qualified Data.Map.Strict as M
 import Data.Maybe (listToMaybe,fromJust, mapMaybe)
 
@@ -409,3 +409,29 @@ findAssignment sm@(SMS5 _ _ val) w = concatMap (M.toList . (val M.!)) (worldToFa
 -- | Convert a pointed simplicial model to a pointed Kripke model
 simpToKripkePointed :: PointedSimplicialModelS5 -> PointedModelS5
 simpToKripkePointed (sm, x) = (simpToKripke sm, fromJust (elemIndex x (facetsOf sm)) + 1)
+
+-- * S5 Kripke models to S5 simplicial models
+
+-- | Convert a proper Kripke model to a simplicial model
+kripkeToSimp :: KripkeModelS5 -> SimplicialModelS5
+kripkeToSimp krm
+  | isProper krm && isLocal krm = undefined
+  | isProper krm = undefined
+  | otherwise = error "given Kripke model is not proper" 
+
+-- | Check whether a given Kripke model is proper
+-- uses the following equivalence: 
+-- \[\bigcap_{i\in A}R_i = Id \iff \forall s\in W(\bigcap_{i\in A}[s]_i = \{s\})\]
+-- (for proof see Sec. 3.2.2 of thesis)
+isProper :: KripkeModelS5 -> Bool
+isProper m@(KrMS5 _ rel _) = all (\w -> intersectAll (map (`equivClass` w) (agentsOf m)) == [w]) (worldsOf m) where
+  equivClass ag world = fromJust (find (world `elem`) (apply rel ag)) -- \([w]_{ag}\)
+  intersectAll [] = []
+  intersectAll (x:xs) = foldr intersect x xs
+
+-- | Check whether a given Kripke model is local
+isLocal :: KripkeModelS5 -> Bool
+isLocal m@(KrMS5 _ rel val) = all isLocalVar (vocabOf m) where
+  isLocalVar p = any (isLocalVarForAg p) (agentsOf m)
+  isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag)
+  pInW p w = apply (apply val w) p
