@@ -23,7 +23,7 @@ module SMCDEL.Translations.S5 where
 
 import Data.Containers.ListUtils (nubOrd)
 import Data.HasCacBDD hiding (Top,Bot)
-import Data.List (groupBy,sort,(\\),elemIndex,intersect, union,find)
+import Data.List (groupBy,sort,(\\),elemIndex,intersect, union,find,nub)
 import qualified Data.Map.Strict as M
 import Data.Maybe (listToMaybe,fromJust, mapMaybe)
 
@@ -413,11 +413,26 @@ simpToKripkePointed (sm, x) = (simpToKripke sm, fromJust (elemIndex x (facetsOf 
 -- * S5 Kripke models to S5 simplicial models
 
 -- | Convert a proper Kripke model to a simplicial model
+-- Currently only works for proper and local Kripke models
+-- When a var is local to several agents, assigns it to all of these agents
+-- (i.e. local vars not mutually exclusive)
 kripkeToSimp :: KripkeModelS5 -> SimplicialModelS5
-kripkeToSimp krm
-  | isProper krm && isLocal krm = undefined
-  | isProper krm = undefined
+kripkeToSimp krm@(KrMS5 ws rel val)
+  | isProper krm && isLocal krm = SMS5 sc col sval 
+  | isProper krm = undefined -- TODO: transform to local and apply kripkeToSimp to new local KrM
   | otherwise = error "given Kripke model is not proper" 
+  where
+    vertByAg = map (apply rel) (agentsOf krm)
+    agToVert = zip (agentsOf krm) vertByAg
+    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert
+    internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
+    actualToInternal v = vertInternal !! (v - 1)
+    sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
+    col = M.fromList $ map (\pair -> (internalToActual pair, snd pair)) vertInternal
+    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, apply (apply val (head $ fst (actualToInternal k))) p)) (allLocalPsForAg ag))) col
+    allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
+    isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
+    pInW p w = apply (apply val w) p
 
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
@@ -425,7 +440,7 @@ kripkeToSimp krm
 -- (for proof see Sec. 3.2.2 of thesis)
 isProper :: KripkeModelS5 -> Bool
 isProper m@(KrMS5 _ rel _) = all (\w -> intersectAll (map (`equivClass` w) (agentsOf m)) == [w]) (worldsOf m) where
-  equivClass ag world = fromJust (find (world `elem`) (apply rel ag)) -- \([w]_{ag}\)
+  equivClass ag world = fromJust $ find (world `elem`) (apply rel ag) -- \([w]_{ag}\)
   intersectAll [] = []
   intersectAll (x:xs) = foldr intersect x xs
 
