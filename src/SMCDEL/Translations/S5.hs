@@ -433,6 +433,29 @@ kripkeToSimp krm@(KrMS5 ws rel val)
     allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
     isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
     pInW p w = apply (apply val w) p
+  
+-- | Convert a pointed proper Kripke model to a pointed simplicial model
+-- Currently only works for proper and local Kripke models
+-- When a var is local to several agents, assigns it to all of these agents
+-- (i.e. local vars not mutually exclusive)
+kripkeToSimpPointed :: PointedModelS5 -> PointedSimplicialModelS5
+kripkeToSimpPointed (krm@(KrMS5 ws rel val), cur)
+  | isProper krm && isLocal krm = (SMS5 sc col sval, x) 
+  | isProper krm = undefined -- TODO: transform to local and apply kripkeToSimp to new local KrM
+  | otherwise = error "given Kripke model is not proper" 
+  where
+    vertByAg = map (apply rel) (agentsOf krm)
+    agToVert = zip (agentsOf krm) vertByAg
+    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert
+    internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
+    actualToInternal v = vertInternal !! (v - 1)
+    sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
+    col = M.fromList $ map (\pair -> (internalToActual pair, snd pair)) vertInternal
+    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, apply (apply val (head $ fst (actualToInternal k))) p)) (allLocalPsForAg ag))) col
+    allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
+    isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
+    pInW p w = apply (apply val w) p
+    x = map (internalToActual . (\ag -> (fromJust (find (cur `elem`) (apply rel ag)), ag))) (agentsOf krm)
 
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
