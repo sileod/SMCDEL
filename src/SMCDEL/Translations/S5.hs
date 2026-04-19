@@ -413,18 +413,16 @@ simpToKripkePointed (sm, x) = (simpToKripke sm, fromJust (elemIndex x (facetsOf 
 -- * S5 Kripke models to S5 simplicial models
 
 -- | Convert a proper Kripke model to a simplicial model
--- Currently only works for proper and local Kripke models
 -- When a var is local to several agents, assigns it to all of these agents
--- (i.e. local vars not mutually exclusive)
+-- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimp :: KripkeModelS5 -> SimplicialModelS5
 kripkeToSimp krm@(KrMS5 ws rel val)
-  | isProper krm && isLocal krm = SMS5 sc col sval 
-  | isProper krm = undefined -- TODO: transform to local and apply kripkeToSimp to new local KrM
-  | otherwise = error "given Kripke model is not proper" 
+  | isProper krm && isLocal krm = SMS5 sc col sval
+  | otherwise = kripkeToSimp $ makeLocalAndProper krm
   where
     vertByAg = map (apply rel) (agentsOf krm)
     agToVert = zip (agentsOf krm) vertByAg
-    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert
+    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert -- [([World], Agent)]
     internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
     actualToInternal v = vertInternal !! (v - 1)
     sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
@@ -433,16 +431,14 @@ kripkeToSimp krm@(KrMS5 ws rel val)
     allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
     isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
     pInW p w = apply (apply val w) p
-  
+
 -- | Convert a pointed proper Kripke model to a pointed simplicial model
--- Currently only works for proper and local Kripke models
 -- When a var is local to several agents, assigns it to all of these agents
--- (i.e. local vars not mutually exclusive)
+-- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimpPointed :: PointedModelS5 -> PointedSimplicialModelS5
 kripkeToSimpPointed (krm@(KrMS5 ws rel val), cur)
-  | isProper krm && isLocal krm = (SMS5 sc col sval, x) 
-  | isProper krm = undefined -- TODO: transform to local and apply kripkeToSimp to new local KrM
-  | otherwise = error "given Kripke model is not proper" 
+  | isProper krm && isLocal krm = (SMS5 sc col sval, x)
+  | otherwise = kripkeToSimpPointed (makeLocalAndProper krm, cur)
   where
     vertByAg = map (apply rel) (agentsOf krm)
     agToVert = zip (agentsOf krm) vertByAg
@@ -473,3 +469,10 @@ isLocal m@(KrMS5 _ rel val) = all isLocalVar (vocabOf m) where
   isLocalVar p = any (isLocalVarForAg p) (agentsOf m)
   isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag)
   pInW p w = apply (apply val w) p
+
+-- | Convert a non-local or non-proper Kripke model to a local proper Kripke model by adding a new agent "whiteCisMan" that knows the truth value of all variables in all worlds
+-- Local proper version contains more information than non-local/non-proper 
+-- version (but equivalent for language of non-local version)
+makeLocalAndProper :: KripkeModelS5 -> KripkeModelS5
+makeLocalAndProper (KrMS5 ws rel val) = KrMS5 ws newrel val where
+  newrel = ("whiteCisMan", map (: []) ws) : rel
