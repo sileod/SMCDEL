@@ -418,15 +418,14 @@ kripkeToSimpWithMap krm@(KrMS5 ws rel val)
   | isProper krm && isLocal krm = (SMS5 sc col sval, internalToActual)
   | otherwise = kripkeToSimpWithMap $ makeLocalAndProper krm
   where
-    vertByAg = map (apply rel) (agentsOf krm)
-    agToVert = zip (agentsOf krm) vertByAg
-    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert -- [([World], Agent)]
+    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) rel -- [([World], Agent)]
     internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
     actualToInternal v = vertInternal !! (v - 1)
-    sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
-    col = M.fromList $ map (\pair -> (internalToActual pair, snd pair)) vertInternal
-    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, apply (apply val (head $ fst (actualToInternal k))) p)) (allLocalPsForAg ag))) col
-    allLocalPsForAg ag = filter (\p -> isLocalVarForAg krm p ag) (vocabOf krm)
+    sc = map (worldToFacet krm internalToActual) ws
+    col = M.fromList $ map (\v -> (internalToActual v, snd v)) vertInternal
+    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, pInV k p)) (localPs ag))) col
+    pInV v = apply (apply val (head $ fst (actualToInternal v)))
+    localPs ag = filter (\p -> isLocalVarForAg krm p ag) (vocabOf krm)
 
 -- | Convert a pointed Kripke model to a pointed simplicial model
 -- When a var is local to several agents, assigns it to all of these agents
@@ -446,7 +445,8 @@ kripkeToSimpMultipointed (krm, ws) = (sm, xs) where
 
 -- | Given a Kripke model and a map from the internal representation to the actual vertex, convert a world to the corresponding facet
 worldToFacet :: KripkeModelS5 -> (([World], Agent) -> Vert) -> World -> Facet
-worldToFacet krm@(KrMS5 _ rel _) internalToActual w = map (internalToActual . (\ag -> (fromJust (find (w `elem`) (apply rel ag)), ag))) (agentsOf krm)
+worldToFacet krm@(KrMS5 _ rel _) internToAct w = map (internToAct . vert) (agentsOf krm) where
+  vert ag = (fromJust (find (w `elem`) (apply rel ag)), ag)
 
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
