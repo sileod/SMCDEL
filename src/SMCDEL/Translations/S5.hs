@@ -377,48 +377,42 @@ actionToEventMulti (actm, curActions) = (trf, curActionsLaw) where
 
 -- | Convert a simplicial model to a Kripke model
 simpToKripke :: SimplicialModelS5 -> KripkeModelS5
-simpToKripke sm = KrMS5 worlds rel val where
+simpToKripke sm@(SMS5 _ _ sval) = KrMS5 worlds rel val where
   worlds = take (length (facetsOf sm)) [1..]
-  rel = [(ag, findPartition sm ag) | ag <- agentsOf sm]
-  val = [(world, findAssignment sm world) | world <- worlds]
-
--- | Given a simplicial model and an agent, find the partition encoding the equivalence relations of this agent
--- reverses order
-findPartition :: SimplicialModelS5 -> Agent -> Partition
-findPartition sm ag = findPartitionHelper sm ag []
-
-findPartitionHelper :: SimplicialModelS5 -> Agent -> [[World]] -> Partition
-findPartitionHelper sm ag eqClasses
-  | length (foldr union [] eqClasses) == length (facetsOf sm) = eqClasses -- all equivalence classes found
-  | otherwise = findPartitionHelper sm ag (findEquivalenceClass sm (head remainingWorlds) ag : eqClasses) where
-    remainingWorlds = facetsOf sm \\ map (worldToFacet sm) (foldr union [] eqClasses)
-
--- | Given a simplicial model, a facet and an agent, find the corresponding equivalence class of worlds
-findEquivalenceClass :: SimplicialModelS5 -> Facet -> Agent -> [World]
-findEquivalenceClass sm x ag = map (+ 1) (mapMaybe (`elemIndex` facetsOf sm) (getRelFacets sm x [ag]))
-
--- | Given a simplicial model and a world, find the corresponding facet in the simplicial model
-worldToFacet :: SimplicialModelS5 -> World -> Facet
-worldToFacet sm w = facetsOf sm !! (w - 1)
-
--- | Given a simplicial model and a world, find the corresponding assignment
--- does not necessarily preserve order
-findAssignment :: SimplicialModelS5 -> World -> SMCDEL.Explicit.S5.Assignment
-findAssignment sm@(SMS5 _ _ val) w = concatMap (M.toList . (val M.!)) (worldToFacet sm w)
+  rel = [(ag, findPartition ag) | ag <- agentsOf sm]
+  val = [(world, findAssignment world) | world <- worlds]
+  findPartition ag = helper [] where
+    helper eqClasses
+        | length (foldr union [] eqClasses) == length (facetsOf sm) = eqClasses -- all equivalence classes found
+        | otherwise = helper (findEquivalenceClass (head remainingWorlds) : eqClasses) where
+          findEquivalenceClass x = map (+ 1) (mapMaybe (`elemIndex` facetsOf sm) (getRelFacets sm x [ag]))
+          remainingWorlds = facetsOf sm \\ map worldToFacet (foldr union [] eqClasses)
+  findAssignment w = concatMap (M.toList . (sval M.!)) (worldToFacet w) -- order not preserved (reversed)
+  worldToFacet w = facetsOf sm !! (w - 1)
 
 -- | Convert a pointed simplicial model to a pointed Kripke model
 simpToKripkePointed :: PointedSimplicialModelS5 -> PointedModelS5
-simpToKripkePointed (sm, x) = (simpToKripke sm, fromJust (elemIndex x (facetsOf sm)) + 1)
+simpToKripkePointed (sm, x) = (simpToKripke sm, facetToWorld sm x)
+
+-- | Convert a facet to the corresponding world
+facetToWorld :: SimplicialModelS5 -> Facet -> World
+facetToWorld sm x = fromJust (elemIndex x (facetsOf sm)) + 1
 
 -- * S5 Kripke models to S5 simplicial models
 
--- | Convert a proper Kripke model to a simplicial model
+-- | Convert a Kripke model to a simplicial model
 -- When a var is local to several agents, assigns it to all of these agents
 -- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimp :: KripkeModelS5 -> SimplicialModelS5
-kripkeToSimp krm@(KrMS5 ws rel val)
-  | isProper krm && isLocal krm = SMS5 sc col sval
-  | otherwise = kripkeToSimp $ makeLocalAndProper krm
+kripkeToSimp krm = fst $ kripkeToSimpWithMap krm
+
+-- | Same as kripkeToSimp, but additionally returns a function that given an internal representation of a vertex, returns the corresponding actual vertex
+-- When a var is local to several agents, assigns it to all of these agents
+-- (i.e. sets of local vars \(P_i\) not mutually disjoint)
+kripkeToSimpWithMap :: KripkeModelS5 -> (SimplicialModelS5, ([World], Agent) -> Vert)
+kripkeToSimpWithMap krm@(KrMS5 ws rel val)
+  | isProper krm && isLocal krm = (SMS5 sc col sval, internalToActual)
+  | otherwise = kripkeToSimpWithMap $ makeLocalAndProper krm
   where
     vertByAg = map (apply rel) (agentsOf krm)
     agToVert = zip (agentsOf krm) vertByAg
@@ -428,30 +422,15 @@ kripkeToSimp krm@(KrMS5 ws rel val)
     sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
     col = M.fromList $ map (\pair -> (internalToActual pair, snd pair)) vertInternal
     sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, apply (apply val (head $ fst (actualToInternal k))) p)) (allLocalPsForAg ag))) col
-    allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
-    isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
-    pInW p w = apply (apply val w) p
+    allLocalPsForAg ag = filter (\p -> isLocalVarForAg krm p ag) (vocabOf krm)
 
--- | Convert a pointed proper Kripke model to a pointed simplicial model
+-- | Convert a pointed Kripke model to a pointed simplicial model
 -- When a var is local to several agents, assigns it to all of these agents
 -- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimpPointed :: PointedModelS5 -> PointedSimplicialModelS5
-kripkeToSimpPointed (krm@(KrMS5 ws rel val), cur)
-  | isProper krm && isLocal krm = (SMS5 sc col sval, x)
-  | otherwise = kripkeToSimpPointed (makeLocalAndProper krm, cur)
-  where
-    vertByAg = map (apply rel) (agentsOf krm)
-    agToVert = zip (agentsOf krm) vertByAg
-    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) agToVert
-    internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
-    actualToInternal v = vertInternal !! (v - 1)
-    sc = nub $ map (\w -> map (\pair -> internalToActual (fromJust (find (w `elem`) (snd pair)) , fst pair)) agToVert) ws
-    col = M.fromList $ map (\pair -> (internalToActual pair, snd pair)) vertInternal
-    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, apply (apply val (head $ fst (actualToInternal k))) p)) (allLocalPsForAg ag))) col
-    allLocalPsForAg ag = filter (`isLocalVarForAg` ag) (vocabOf krm)
-    isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag) -- is p local for ag?
-    pInW p w = apply (apply val w) p
-    x = map (internalToActual . (\ag -> (fromJust (find (cur `elem`) (apply rel ag)), ag))) (agentsOf krm)
+kripkeToSimpPointed (krm@(KrMS5 _ rel _), cur) = (sm, x) where
+  sm = kripkeToSimp krm
+  x = map (snd (kripkeToSimpWithMap krm) . (\ag -> (fromJust (find (cur `elem`) (apply rel ag)), ag))) (agentsOf krm)
 
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
@@ -459,16 +438,19 @@ kripkeToSimpPointed (krm@(KrMS5 ws rel val), cur)
 -- (for proof see Sec. 3.2.2 of thesis)
 isProper :: KripkeModelS5 -> Bool
 isProper m@(KrMS5 _ rel _) = all (\w -> intersectAll (map (`equivClass` w) (agentsOf m)) == [w]) (worldsOf m) where
-  equivClass ag world = fromJust $ find (world `elem`) (apply rel ag) -- \([w]_{ag}\)
+  equivClass ag world = fromJust $ find (world `elem`) (apply rel ag) -- \([world]_{ag}\)
   intersectAll [] = []
   intersectAll (x:xs) = foldr intersect x xs
 
 -- | Check whether a given Kripke model is local
 isLocal :: KripkeModelS5 -> Bool
-isLocal m@(KrMS5 _ rel val) = all isLocalVar (vocabOf m) where
-  isLocalVar p = any (isLocalVarForAg p) (agentsOf m)
-  isLocalVarForAg p ag = all (\eqCl -> all (pInW p) eqCl || not (any (pInW p) eqCl)) (apply rel ag)
-  pInW p w = apply (apply val w) p
+isLocal krm = all isLocalVar (vocabOf krm) where
+  isLocalVar p = any (isLocalVarForAg krm p) (agentsOf krm)
+
+-- | Check whether a given propositional variable is local for a given agent in a given Kripke model
+isLocalVarForAg :: KripkeModelS5 -> Prp -> Agent -> Bool
+isLocalVarForAg (KrMS5 _ rel val) p ag = all (\eqCl -> all (`pInW` p) eqCl || not (any (`pInW` p) eqCl)) (apply rel ag) where
+  pInW w = apply (apply val w)
 
 -- | Convert a non-local or non-proper Kripke model to a local proper Kripke model by adding a new agent "whiteCisMan" that knows the truth value of all variables in all worlds
 -- Local proper version contains more information than non-local/non-proper 
