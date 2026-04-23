@@ -394,6 +394,10 @@ simpToKripke sm@(SMS5 _ _ sval) = KrMS5 worlds rel val where
 simpToKripkePointed :: PointedSimplicialModelS5 -> PointedModelS5
 simpToKripkePointed (sm, x) = (simpToKripke sm, facetToWorld sm x)
 
+-- | Convert a multipointed simplicial model to a multipointed Kripke model
+simpToKripkeMultipointed :: MultipointedSimplicialModelS5 -> MultipointedModelS5
+simpToKripkeMultipointed (sm , xs) = (simpToKripke sm, [facetToWorld sm x | x <- xs])
+
 -- | Convert a facet to the corresponding world
 facetToWorld :: SimplicialModelS5 -> Facet -> World
 facetToWorld sm x = fromJust (elemIndex x (facetsOf sm)) + 1
@@ -428,9 +432,21 @@ kripkeToSimpWithMap krm@(KrMS5 ws rel val)
 -- When a var is local to several agents, assigns it to all of these agents
 -- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimpPointed :: PointedModelS5 -> PointedSimplicialModelS5
-kripkeToSimpPointed (krm@(KrMS5 _ rel _), cur) = (sm, x) where
-  sm = kripkeToSimp krm
-  x = map (snd (kripkeToSimpWithMap krm) . (\ag -> (fromJust (find (cur `elem`) (apply rel ag)), ag))) (agentsOf krm)
+kripkeToSimpPointed (krm, cur) = (sm, x) where
+  (sm, internalToActual) = kripkeToSimpWithMap krm
+  x = worldToFacet krm internalToActual cur
+
+-- | Convert a multipointed Kripke model to a multipointed simplicial model
+-- When a var is local to several agents, assigns it to all of these agents
+-- (i.e. sets of local vars \(P_i\) not mutually disjoint)
+kripkeToSimpMultipointed :: MultipointedModelS5 -> MultipointedSimplicialModelS5
+kripkeToSimpMultipointed (krm, ws) = (sm, xs) where
+  (sm, internalToActual) = kripkeToSimpWithMap krm
+  xs = [worldToFacet krm internalToActual w | w <- ws]
+
+-- | Given a Kripke model and a map from the internal representation to the actual vertex, convert a world to the corresponding facet
+worldToFacet :: KripkeModelS5 -> (([World], Agent) -> Vert) -> World -> Facet
+worldToFacet krm@(KrMS5 _ rel _) internalToActual w = map (internalToActual . (\ag -> (fromJust (find (w `elem`) (apply rel ag)), ag))) (agentsOf krm)
 
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
@@ -457,4 +473,4 @@ isLocalVarForAg (KrMS5 _ rel val) p ag = all (\eqCl -> all (`pInW` p) eqCl || no
 -- version (but equivalent for language of non-local version)
 makeLocalAndProper :: KripkeModelS5 -> KripkeModelS5
 makeLocalAndProper (KrMS5 ws rel val) = KrMS5 ws newrel val where
-  newrel = ("whiteCisMan", map (: []) ws) : rel
+  newrel = ("whiteCisMan", [[w] | w <- ws]) : rel

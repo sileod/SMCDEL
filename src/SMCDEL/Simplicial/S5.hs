@@ -50,14 +50,11 @@ instance HasVocab SimplicialModelS5 where
 instance HasAgents SimplicialModelS5 where
     agentsOf (SMS5 _ col _) = nub (M.elems col)
 
-instance Semantics SimplicialModelS5 where
-    isTrue sm form = all (\x -> eval (sm, x) form) (facetsOf sm)
-
 instance Pointed SimplicialModelS5 Facet where
 type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
 
-instance Semantics PointedSimplicialModelS5 where
-    isTrue = eval
+instance Pointed SimplicialModelS5 [Facet] where
+type MultipointedSimplicialModelS5 = (SimplicialModelS5, [Facet])
 
 -- | Get a list of variables that are true in a given vertex
 getLocalVar :: SimplicialModelS5 -> Vert -> [Prp]
@@ -110,6 +107,15 @@ eval pm (Dkw ags form) = eval pm (Dk ags form) || eval pm (Dk ags (Neg form))
 eval (sm, _) (G form) = isTrue sm form
 eval pm (PubAnnounce form1 form2) = not (eval pm form1) || eval (update pm form1) form2 
 eval _ (Dia _ _) = undefined -- TODO
+
+instance Semantics SimplicialModelS5 where
+    isTrue sm form = all (\x -> eval (sm, x) form) (facetsOf sm)
+
+instance Semantics PointedSimplicialModelS5 where
+    isTrue = eval
+
+instance Semantics MultipointedSimplicialModelS5 where
+    isTrue (sm, xs) form = all (\x -> isTrue (sm, x) form) xs
 
 instance Update SimplicialModelS5 Form where
     unsafeUpdate sm@(SMS5 sc col val) form = SMS5 newsc newcol newval where
