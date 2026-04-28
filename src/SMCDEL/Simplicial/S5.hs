@@ -13,7 +13,7 @@ Based on definitions from:
 
 module SMCDEL.Simplicial.S5 where
 
-import Data.List (intersect, nub, union, (\\))
+import Data.List (intersect, nub, union, foldl')
 import qualified Data.Map.Strict as M
 import Test.QuickCheck
 
@@ -129,17 +129,10 @@ instance Update PointedSimplicialModelS5 Form where
     unsafeUpdate (sm, x) form = (unsafeUpdate sm form, x)
 
 -- TODO: 
---   - make more robust (usually evaluates fast, but sometimes very slow (or
---     possibly even hangs forever?))
---     (possible issue(s): facet suchThat containsAllAgOnce; sc suchThat connected)
---   - increase probability of SC with facets that share more than one vertex
---     (possible fix: start with random facet, then recursively add 7 (?)
---     connected facets where each new facet contains a sublist of a random
---     already existing facet, then define sc as sublist)
---   - shrink (remove doubles from sc, discard all unused verts)
+--   - shrink
 instance Arbitrary SimplicialModelS5 where
     arbitrary = do
-        let verts = [1..30]
+        let verts = [1..30 :: Vert]
         col <- M.fromList <$> mapM (\v -> do
             ag <- elements defaultAgents
             return (v, ag)
@@ -150,11 +143,27 @@ instance Arbitrary SimplicialModelS5 where
             return (v,ass)
             ) verts
         let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
-        -- let maybeFacet = sublistOf verts `suchThatMaybe` containsAllAgOnce
-        let facet = vectorOf 5 (elements verts) `suchThat` containsAllAg
-        let connected sc = all (\f1 -> any (\f2 -> f1 `intersect` f2 /= []) (sc \\ [f1])) sc
-        sc <- resize 8 (listOf1 facet) `suchThat` connected
-        return $ SMS5 sc col val
+        initFacet <- vectorOf 5 (elements verts) `suchThat` containsAllAg
+        size <- chooseInt (1, 8)
+        let fix f = x where x = f x
+        sc <- fix (\f sc -> do
+            connectTo <- elements sc
+            newFacetPart <- sublistOf connectTo
+            let agIn = map (col M.!)
+            newFacet <- fix (\g vs-> do
+                newV <- elements verts `suchThat` (\v -> (col M.! v) `notElem` agIn vs)
+                let newFace = newV : vs
+                if length newFace < 5 then g newFace
+                                      else return newFace
+                ) newFacetPart
+            let newSc = newFacet : sc
+            if length newSc < size then f newSc
+                                   else if size == 1 then return sc else return newSc
+            ) [initFacet]
+        let usedVerts = foldl' union [] sc
+            colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
+            valActual = M.filterWithKey (\k _ -> k `elem` usedVerts) val
+        return $ SMS5 sc colActual valActual
 
 -- Examples
 
