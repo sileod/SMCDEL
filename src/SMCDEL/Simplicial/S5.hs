@@ -13,8 +13,9 @@ Based on definitions from:
 
 module SMCDEL.Simplicial.S5 where
 
-import Data.List (intersect, nub, union)
+import Data.List (intersect, nub, union, (\\))
 import qualified Data.Map.Strict as M
+import Test.QuickCheck
 
 import SMCDEL.Language
 
@@ -127,9 +128,35 @@ instance Update SimplicialModelS5 Form where
 instance Update PointedSimplicialModelS5 Form where
     unsafeUpdate (sm, x) form = (unsafeUpdate sm form, x)
 
--- Examples
+-- TODO: 
+--   - make more robust (usually evaluates fast, but sometimes very slow (or
+--     possibly even hangs forever?))
+--     (possible issue(s): facet suchThat containsAllAgOnce; sc suchThat connected)
+--   - increase probability of SC with facets that share more than one vertex
+--     (possible fix: start with random facet, then recursively add 7 (?)
+--     connected facets where each new facet contains a sublist of a random
+--     already existing facet, then define sc as sublist)
+--   - shrink (remove doubles from sc, discard all unused verts)
+instance Arbitrary SimplicialModelS5 where
+    arbitrary = do
+        let verts = [1..30]
+        col <- M.fromList <$> mapM (\v -> do
+            ag <- elements defaultAgents
+            return (v, ag)
+            ) verts
+        val <- M.fromList <$> mapM (\v -> do
+            let prp = P $ read (col M.! v)
+            ass <- M.singleton prp <$> choose (True, False)
+            return (v,ass)
+            ) verts
+        let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
+        -- let maybeFacet = sublistOf verts `suchThatMaybe` containsAllAgOnce
+        let facet = vectorOf 5 (elements verts) `suchThat` containsAllAg
+        let connected sc = all (\f1 -> any (\f2 -> f1 `intersect` f2 /= []) (sc \\ [f1])) sc
+        sc <- resize 8 (listOf1 facet) `suchThat` connected
+        return $ SMS5 sc col val
 
--- TODO: instance Arbitrary SimplicialModelS5
+-- Examples
 
 -- Fig. 4 from proposal
 exampleSM :: SimplicialModelS5
