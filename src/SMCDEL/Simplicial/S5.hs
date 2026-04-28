@@ -13,7 +13,7 @@ Based on definitions from:
 
 module SMCDEL.Simplicial.S5 where
 
-import Data.List (intersect, nub, union, foldl')
+import Data.List
 import qualified Data.Map.Strict as M
 import Test.QuickCheck
 
@@ -44,6 +44,15 @@ instance HasFacets SimplicialComplex where
 
 instance HasFacets SimplicialModelS5 where
     facetsOf (SMS5 sc _ _) = sc
+
+class HasVertices a where
+    vertsOf :: a -> [Vert]
+
+instance HasVertices SimplicialComplex where
+    vertsOf = foldl' union []
+
+instance HasVertices SimplicialModelS5 where
+    vertsOf (SMS5 sc _ _) = vertsOf sc
 
 instance HasVocab SimplicialModelS5 where
    vocabOf (SMS5 _ _ val) = nub ((concatMap M.keys . M.elems) val)
@@ -123,32 +132,35 @@ instance Update SimplicialModelS5 Form where
         newsc = filter (\x -> eval (sm, x) form) sc
         newcol = M.filterWithKey (\k _ -> k `elem` newvert) col
         newval = M.filterWithKey (\k _ -> k `elem` newvert) val 
-        newvert = foldr union [] newsc
+        newvert = vertsOf newsc
 
 instance Update PointedSimplicialModelS5 Form where
     unsafeUpdate (sm, x) form = (unsafeUpdate sm form, x)
 
--- TODO: 
---   - shrink
+withoutFacet :: SimplicialModelS5 -> Facet -> SimplicialModelS5
+withoutFacet (SMS5 sc col val) x = SMS5
+    (delete x sc)
+    (M.filterWithKey (\k _ -> k `elem` newVs) col)
+    (M.filterWithKey (\k _ -> k `elem` newVs) val)
+    where
+        newVs = vertsOf (delete x sc)
+
 instance Arbitrary SimplicialModelS5 where
     arbitrary = do
-        let verts = [1..30 :: Vert]
+        let verts = [1..45 :: Vert]
+        -- let col = M.fromList $ zip verts (concat $ replicate 9 defaultAgents)
         col <- M.fromList <$> mapM (\v -> do
             ag <- elements defaultAgents
             return (v, ag)
             ) verts
-        val <- M.fromList <$> mapM (\v -> do
-            let prp = P $ read (col M.! v)
-            ass <- M.singleton prp <$> choose (True, False)
-            return (v,ass)
-            ) verts
         let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
         initFacet <- vectorOf 5 (elements verts) `suchThat` containsAllAg
-        size <- chooseInt (1, 8)
+        -- let initFacet = [1, 2, 3, 4, 5]
+        size <- chooseInt (1, 9)
         let fix f = x where x = f x
         sc <- fix (\f sc -> do
             connectTo <- elements sc
-            newFacetPart <- sublistOf connectTo
+            newFacetPart <- sublistOf connectTo `suchThat` (\x -> length x < 5)
             let agIn = map (col M.!)
             newFacet <- fix (\g vs-> do
                 newV <- elements verts `suchThat` (\v -> (col M.! v) `notElem` agIn vs)
@@ -160,10 +172,16 @@ instance Arbitrary SimplicialModelS5 where
             if length newSc < size then f newSc
                                    else if size == 1 then return sc else return newSc
             ) [initFacet]
-        let usedVerts = foldl' union [] sc
+        let usedVerts = vertsOf sc
             colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
-            valActual = M.filterWithKey (\k _ -> k `elem` usedVerts) val
-        return $ SMS5 sc colActual valActual
+        val <- M.fromList <$> mapM (\v -> do
+            let prp = P $ read (col M.! v)
+            ass <- M.singleton prp <$> choose (True, False)
+            return (v,ass)
+            ) usedVerts
+        return $ SMS5 sc colActual val
+    shrink sm@(SMS5 sc _ _) = 
+        [ sm `withoutFacet` x | x <- sc, not (null $ delete x sc) ]
 
 -- Examples
 
