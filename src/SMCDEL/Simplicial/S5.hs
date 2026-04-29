@@ -76,6 +76,9 @@ getLocalVar (SMS5 _ _ val) vert = case M.lookup vert val of
 getGlobalVar :: SimplicialModelS5 -> Facet -> [Prp]
 getGlobalVar sm = concatMap (getLocalVar sm)
 
+agAt :: SimplicialModelS5 -> Vert -> Agent
+agAt (SMS5 _ col _) v = col M.! v
+
 -- | Get a list of all neighbouring facets where all given agents sit at an intersection  
 getRelFacets :: SimplicialModelS5 -> Facet -> [Agent] -> [Facet]
 getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` map (col M.!) (facet `intersect` x)) == ags) sc
@@ -160,7 +163,7 @@ instance Arbitrary SimplicialModelS5 where
         let fix f = x where x = f x
         sc <- fix (\f sc -> do
             connectTo <- elements sc
-            newFacetPart <- sublistOf connectTo `suchThat` (\x -> length x < 5)
+            newFacetPart <- sublistOf connectTo `suchThat` (\x -> length x < 5 && not (null x))
             let agIn = map (col M.!)
             newFacet <- fix (\g vs-> do
                 newV <- elements verts `suchThat` (\v -> (col M.! v) `notElem` agIn vs)
@@ -194,7 +197,7 @@ exampleSM = SMS5
 
 -- Fig. 4 from proposal, pointing towards facet X
 pointedExampleSM :: PointedSimplicialModelS5
-pointedExampleSM = (exampleSM, [1, 2, 3])
+pointedExampleSM = (exampleSM, [1, 2, 3] :: Facet)
 
 -- C' from Example 22 in [Dit+22] (p. 32)
 exampleSM2 :: SimplicialModelS5
