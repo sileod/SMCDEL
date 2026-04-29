@@ -66,6 +66,9 @@ type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
 instance Pointed SimplicialModelS5 [Facet] where
 type MultipointedSimplicialModelS5 = (SimplicialModelS5, [Facet])
 
+instance (HasFacets a, Pointed a b) => HasFacets (a, b) where
+    facetsOf = facetsOf . fst
+
 -- | Get a list of variables that are true in a given vertex
 getLocalVar :: SimplicialModelS5 -> Vert -> [Prp]
 getLocalVar (SMS5 _ _ val) vert = case M.lookup vert val of
@@ -185,6 +188,18 @@ instance Arbitrary SimplicialModelS5 where
         return $ SMS5 sc colActual val
     shrink sm@(SMS5 sc _ _) = 
         [ sm `withoutFacet` x | x <- sc, not (null $ delete x sc) ]
+
+instance {-# OVERLAPPING #-} Arbitrary PointedSimplicialModelS5 where
+    arbitrary = do
+        sm <- arbitrary :: Gen SimplicialModelS5
+        x <- elements (facetsOf sm)
+        return (sm, x)
+
+instance {-# OVERLAPPING #-} Arbitrary MultipointedSimplicialModelS5 where
+    arbitrary = do
+        sm <- arbitrary :: Gen SimplicialModelS5
+        xs <- sublistOf (facetsOf sm) `suchThat` (not . null)
+        return (sm, xs)
 
 -- Examples
 
