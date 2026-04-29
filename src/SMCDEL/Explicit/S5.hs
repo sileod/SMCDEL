@@ -146,6 +146,18 @@ instance Arbitrary KripkeModelS5 where
   shrink m@(KrMS5 worlds _ _) =
     [ m `withoutWorld` w | w <- worlds, not (null $ delete w worlds) ]
 
+instance {-# OVERLAPPING #-} Arbitrary PointedModelS5 where
+  arbitrary = do
+    krm <- arbitrary :: Gen KripkeModelS5
+    cur <- elements (worldsOf krm)
+    return (krm, cur)
+
+instance {-# OVERLAPPING #-} Arbitrary MultipointedModelS5 where
+  arbitrary = do
+    krm <- arbitrary :: Gen KripkeModelS5
+    ws <- sublistOf (worldsOf krm) `suchThat` (not . null)
+    return (krm, ws)
+
 -- | Standard semantics for explicit model checking on S5 Kripke models.
 -- See Definition 1.1.3 and 1.2.2 in [MG2018].
 eval :: PointedModelS5 -> Form -> Bool
