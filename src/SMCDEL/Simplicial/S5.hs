@@ -178,7 +178,7 @@ instance Arbitrary SimplicialModelS5 where
         let usedVerts = vertsOf sc
             colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
         val <- M.fromList <$> mapM (\v -> do
-            let prp = P $ read (col M.! v)
+            let prp = P $ read (col M.! v) - 1
             ass <- M.singleton prp <$> choose (True, False)
             return (v,ass)
             ) usedVerts
