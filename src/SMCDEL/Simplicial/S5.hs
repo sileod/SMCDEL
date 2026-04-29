@@ -18,6 +18,7 @@ import qualified Data.Map.Strict as M
 import Test.QuickCheck
 
 import SMCDEL.Language
+import SMCDEL.Internal.Help
 
 -- | A vertex is represented by an integer
 type Vert = Int
@@ -175,8 +176,12 @@ instance Arbitrary SimplicialModelS5 where
                                       else return newFace
                 ) newFacetPart
             let newSc = newFacet : sc
-            if length newSc < size then f newSc
-                                   else if size == 1 then return sc else return newSc
+            if any (newFacet `seteq`) sc 
+                then f sc
+                else if length newSc < size
+                        then f newSc
+                        else if size == 1 then return sc else return newSc
+            
             ) [initFacet]
         let usedVerts = vertsOf sc
             colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
