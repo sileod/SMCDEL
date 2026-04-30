@@ -154,45 +154,70 @@ withoutFacet (SMS5 sc col val) x = SMS5
 
 instance Arbitrary SimplicialModelS5 where
     arbitrary = do
-        let verts = [1..45 :: Vert]
-        -- let col = M.fromList $ zip verts (concat $ replicate 9 defaultAgents)
-        col <- M.fromList <$> mapM (\v -> do
+        let nonActualVerts = [6..30]
+            verts = [1..30]
+        nonActualCol <- M.fromList <$> mapM (\v -> do
             ag <- elements defaultAgents
             return (v, ag)
-            ) verts
-        let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
-        initFacet <- vectorOf 5 (elements verts) `suchThat` containsAllAg
-        -- let initFacet = [1, 2, 3, 4, 5]
-        size <- chooseInt (1, 9)
-        let fix f = x where x = f x
-        sc <- fix (\f sc -> do
-            connectTo <- elements sc
-            newFacetPart <- sublistOf connectTo `suchThat` (\x -> length x < 5 && not (null x))
-            let agIn = map (col M.!)
-            newFacet <- fix (\g vs-> do
-                newV <- elements verts `suchThat` (\v -> (col M.! v) `notElem` agIn vs)
-                let newFace = newV : vs
-                if length newFace < 5 then g newFace
-                                      else return newFace
-                ) newFacetPart
-            let newSc = newFacet : sc
-            if any (newFacet `seteq`) sc 
-                then f sc
-                else if length newSc < size
-                        then f newSc
-                        else if size == 1 then return sc else return newSc
-            
-            ) [initFacet]
-        let usedVerts = vertsOf sc
-            colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
+            ) nonActualVerts
+        let col = M.insert 1 "1" $
+                  M.insert 2 "2" $
+                  M.insert 3 "3" $
+                  M.insert 4 "4" $
+                  M.insert 5 "5" nonActualCol
         val <- M.fromList <$> mapM (\v -> do
             let prp = P $ read (col M.! v) - 1
             ass <- M.singleton prp <$> choose (True, False)
             return (v,ass)
-            ) usedVerts
-        return $ SMS5 sc colActual val
-    shrink sm@(SMS5 sc _ _) = 
-        [ sm `withoutFacet` x | x <- sc, not (null $ delete x sc) ]
+            ) verts
+        let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
+        let facet = sort <$> vectorOf 5 (elements verts) `suchThat` containsAllAg
+            connected sc = all (\f1 -> any (\f2 -> f1 `intersect` f2 /= []) (sc \\ [f1])) sc
+        sc <- nub <$> resize 9 (listOf1 facet) `suchThat` connected
+        return $ SMS5 sc col val
+
+
+-- instance Arbitrary SimplicialModelS5 where
+--     arbitrary = do
+--         let verts = [1..100 :: Vert]
+--         -- let col = M.fromList $ zip verts (concat $ replicate 9 defaultAgents)
+--         col <- M.fromList <$> mapM (\v -> do
+--             ag <- elements defaultAgents
+--             return (v, ag)
+--             ) verts
+--         let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
+--         initFacet <- vectorOf 5 (elements verts) `suchThat` containsAllAg
+--         -- let initFacet = [1, 2, 3, 4, 5]
+--         size <- chooseInt (1, 9)
+--         let fix f = x where x = f x
+--         sc <- fix (\f sc -> do
+--             connectTo <- elements sc
+--             newFacetPart <- sublistOf connectTo `suchThat` (\x -> length x < 5 && not (null x))
+--             let agIn = map (col M.!)
+--             newFacet <- fix (\g vs-> do
+--                 newV <- elements verts `suchThat` (\v -> (col M.! v) `notElem` agIn vs)
+--                 let newFace = newV : vs
+--                 if length newFace < 5 then g newFace
+--                                       else return newFace
+--                 ) newFacetPart
+--             let newSc = newFacet : sc
+--             if any (newFacet `seteq`) sc 
+--                 then f sc
+--                 else if length newSc < size
+--                         then f newSc
+--                         else if size == 1 then return sc else return newSc
+            
+--             ) [initFacet]
+--         let usedVerts = vertsOf sc
+--             colActual = M.filterWithKey (\k _ -> k `elem` usedVerts) col
+--         val <- M.fromList <$> mapM (\v -> do
+--             let prp = P $ read (col M.! v) - 1
+--             ass <- M.singleton prp <$> choose (True, False)
+--             return (v,ass)
+--             ) usedVerts
+--         return $ SMS5 sc colActual val
+--     shrink sm@(SMS5 sc _ _) = 
+--         [ sm `withoutFacet` x | x <- sc, not (null $ delete x sc) ]
 
 instance {-# OVERLAPPING #-} Arbitrary PointedSimplicialModelS5 where
     arbitrary = do
