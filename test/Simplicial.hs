@@ -29,54 +29,69 @@ main = hspec $ do
       pointedExampleSM |= PubAnnounce (PrpF (P 1)) (Ck ["a", "b", "c"] (PrpF (P 1)))
     it "C', X: p_c is not common knowledge among all ag" $
       not $ (exampleSM2, [1, 2, 3] :: Facet) |= Ck ["a", "b", "c"] (PrpF (P 3))
-  describe "sanity and property checks for random simplicial models" $ do
+  describe "sanity and property checks for randomly generated simplicial models" $ do
+    prop "generating models works without hanging forever" $
+      \m -> withMaxSuccess 10000 $ within 5000 $ (m :: SimplicialModelS5) |= Top
     prop "uses defaultAgents and defaultVocabulary" $ 
-      \m -> agentsOf (m :: SimplicialModelS5) `seteq` defaultAgents && vocabOf m `seteq` defaultVocabulary    
-    prop "sc is pure and dim == number of ags" $
+      \m -> agentsOf (m :: SimplicialModelS5) `seteq` defaultAgents &&
+            vocabOf m `seteq` defaultVocabulary    
+    prop "underlying simplicial complex is pure and dim == number of ags" $
       \m -> all (\x -> length x == length (agentsOf m)) (facetsOf (m :: SimplicialModelS5))
     prop "all facets contain all ags" $ 
       \m -> all (\x -> all (\ag -> ag `elem` map (agAt m) x) (agentsOf m)) (facetsOf (m :: SimplicialModelS5))
     prop "simplicial complex is connected" $ 
-      \m -> length (facetsOf m) == 1 ||
+      \m -> 
+        length (facetsOf m) == 1 ||
         all (\f1 -> any (\f2 -> f1 `intersect` f2 /= []) (delete f1 (facetsOf m))) (facetsOf (m :: SimplicialModelS5))
-    prop "simplicial complex contains no facet twice" $
+    prop "simplicial complex contains no duplicate facets" $
       \m -> not $ any (\f1 -> any (\f2 -> f1 `seteq` f2) (delete f1 (facetsOf m))) (facetsOf (m :: SimplicialModelS5))
     prop "pointed simplicial model points towards an existing facet" $
-      \pm -> snd pm `elem` (facetsOf (fst (pm :: PointedSimplicialModelS5)))
+      \pm -> snd pm `elem` facetsOf (fst (pm :: PointedSimplicialModelS5))
     prop "multipointed simplicial model points towards existing facets" $
       \pm -> all (\x -> x `elem` facetsOf (fst pm)) (snd (pm :: MultipointedSimplicialModelS5))
     prop "distribution of # of facets and # of intersecting vertices" $
       \m -> 
-        let nIntersect _ [] = []
-            nIntersect x (y : ys) = map (\y -> length (x `intersect` y)) (y : ys) : nIntersect y (ys)
-            intersections [] = []
-            intersections (x : xs) = concat $ nIntersect x xs
+        let nIntByPair _ [] = []
+            nIntByPair x (y : ys) = map (\y -> length (x `intersect` y)) (y : ys) : nIntByPair y ys
+            nIntersects [] = []
+            nIntersects (x : xs) = concat $ nIntByPair x xs
         in 
-          tabulate "# intersects between two facets" (map show (intersections (facetsOf m))) $
-          tabulate "# facets" (map show [length (facetsOf m)]) $
+          tabulate "# intersects between two facets" (map show (nIntersects (facetsOf m))) $
+          tabulate "# facets" [show (length (facetsOf m))] $
           (m :: SimplicialModelS5) |= Top
   describe "validities in S5" $ do
+    -- discard test after 200ms if no formula that is Ck/Dk/(Neg) K is found
     prop "Ck ags f --> f" $
-      \m (Group ags) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= (Ck ags f) ==> m |= f)
+      \m (Group ags) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= Ck ags f ==> m |= f)
     prop "Dk ags f --> f" $
-      \m (Group ags) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= (Dk ags f) ==> m |= f)
+      \m (Group ags) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= Dk ags f ==> m |= f)
     prop "K ag f --> f" $
-      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= (K ag f) ==> m |= f)
+      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= K ag f ==> m |= f)
     prop "K ag f --> K ag (K ag f)" $
-      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= (K ag f) ==> m |= (K ag (K ag f)))
+      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= K ag f ==> m |= K ag (K ag f))
     prop "Neg (K ag f) --> K ag (Neg (K ag f))" $
-      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= (Neg (K ag f)) ==> m |= (K ag (Neg (K ag f))))
+      \m (Ag ag) f -> discardAfter 200 ((m :: PointedSimplicialModelS5) |= Neg (K ag f) ==> m |= K ag (Neg (K ag f)))
   describe "Ck and Dk properties" $ do
     prop "Ck ag <-> Dk ag" $
       \m (Ag ag) f -> (m :: PointedSimplicialModelS5) |= (Ck [ag] f `Equi` Dk [ag] f)
     prop "Dk Top" $ 
-      \m (Group g) -> (m :: PointedSimplicialModelS5) |= Dk g Top
+      \m (Group ags) -> (m :: PointedSimplicialModelS5) |= Dk ags Top
     prop "Dk Bottom" $ 
-      \m (Group g) -> not $ (m :: PointedSimplicialModelS5) |= Dk g Bot
+      \m (Group ags) -> not $ (m :: PointedSimplicialModelS5) |= Dk ags Bot
     prop "Ck Top" $ 
-      \m (Group g) -> (m :: PointedSimplicialModelS5) |= Ck g Top
+      \m (Group ags) -> (m :: PointedSimplicialModelS5) |= Ck ags Top
     prop "Ck Bottom" $ 
-      \m (Group g) -> not $ (m :: PointedSimplicialModelS5) |= Ck g Bot
+      \m (Group ags) -> not $ (m :: PointedSimplicialModelS5) |= Ck ags Bot
+    prop "Ck ags f --> K ag f for all ag in ags" $
+      \m (Group ags) f ->
+        discardAfter 200 $
+        (m :: PointedSimplicialModelS5) |= Ck ags f ==> 
+        all (\ag -> m |= K ag f) ags
+    prop "Ck ags f --> K a (K b f) for all a,b in ags" $
+      \m (Group ags) f ->
+        discardAfter 200 $
+        (m :: PointedSimplicialModelS5) |= Ck ags f ==>
+        all (\(a,b) -> m |= K a (K b f)) [(a, b) | a <- ags, b <- ags]
   describe "conversions SM to KrM" $ do
     describe "simpToKripke" $ do
       let x sm = head (facetsOf sm)
@@ -89,7 +104,7 @@ main = hspec $ do
         \sm -> isProper (simpToKripke sm) && isLocal (simpToKripke sm)
     describe "simpToKripkePointed" $ do
       prop "SM and KrM have same vocabulary" $
-        \pm -> (vocabOf pm `seteq` vocabOf (simpToKripkePointed pm))
+        \pm -> vocabOf pm `seteq` vocabOf (simpToKripkePointed pm)
       prop "(sm, x) |= f <-> (simpToKripkePointed (sm, x))" $ 
         \pm f -> (pm |= f) == (simpToKripkePointed pm |= f)
     describe "simpToKripkeMultipointed" $ do
@@ -103,11 +118,49 @@ main = hspec $ do
         \krm -> vocabOf krm `seteq` vocabOf (kripkeToSimp krm)
     describe "kripkeToSimpPointed" $ do
       prop "KrM and SM have same vocabulary" $
-        \krm -> (vocabOf krm `seteq` vocabOf (kripkeToSimpPointed krm))
+        \krm -> vocabOf krm `seteq` vocabOf (kripkeToSimpPointed krm)
       prop "KrM, w |= f <-> SM, X |= f" $
         \krm f -> (krm |= f) == (kripkeToSimpPointed krm |= f)
     describe "kripkeToSimpMultipointed" $ do
       prop "KrM and SM have same vocabulary" $
         \krm -> vocabOf krm `seteq` vocabOf (kripkeToSimpMultipointed krm)
       prop "KrM, ws |= f <-> SM, Xs |= f" $
-        \krm f -> (krm |= f) == ((kripkeToSimpMultipointed krm) |= f)
+        \krm f -> (krm |= f) == (kripkeToSimpMultipointed krm |= f)
+    describe "kripkeToSimpWithMap" $ do
+      prop "internalToActual maps all worlds correctly" $
+        \krm f -> 
+          let
+            internalToActual = snd $ kripkeToSimpWithMap krm
+            ws = worldsOf krm
+            sm = fst $ kripkeToSimpWithMap krm
+            equivX w = worldToFacet krm internalToActual w
+          in
+            all (\w -> (krm, w) |= f == (sm, equivX w) |= f) ws
+
+-- * Predefined Examples
+
+-- Fig. 4 from proposal (in tests above called C)
+exampleSM :: SimplicialModelS5
+exampleSM = SMS5
+    [[1, 2, 3], [2, 3, 4]]
+    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")])
+    (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
+
+-- Fig. 4 from proposal, pointing towards facet X (C, X)
+pointedExampleSM :: PointedSimplicialModelS5
+pointedExampleSM = (exampleSM, [1, 2, 3] :: Facet)
+
+-- C' from Example 22 in [Dit+22] (p. 32)
+exampleSM2 :: SimplicialModelS5
+exampleSM2 = SMS5
+    [[1, 2, 3], [2, 3, 4], [3, 4, 5], [5, 6, 7], [6, 7, 8], [7, 8, 9]]
+    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a"), (5, "b"), (6, "a"), (7, "c"), (8, "b"), (9, "a")])
+    (M.fromList [(1, M.fromList [(P 1, False)]), 
+                 (2, M.fromList [(P 2, True)]), 
+                 (3, M.fromList [(P 3, True)]), 
+                 (4, M.fromList [(P 1, True)]), 
+                 (5, M.fromList [(P 2, False)]), 
+                 (6, M.fromList [(P 1, True)]), 
+                 (7, M.fromList [(P 3, False)]), 
+                 (8, M.fromList [(P 2, True)]), 
+                 (9, M.fromList [(P 1, False)])])
