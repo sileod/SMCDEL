@@ -100,6 +100,8 @@ main = hspec $ do
         \sm -> vocabOf sm `seteq` vocabOf (simpToKripke sm)
       prop "SM, x |= f <-> KrM, w |= f" $
         \sm f -> ((sm, x sm) |= f) == ((simpToKripke sm, w sm) |= f)
+      prop "preserves validity (SM |= f <-> KrM |= f)" $
+        \sm f -> sm |= f == simpToKripke sm |= f
       prop "resulting KrM is proper and local" $
         \sm -> isProper (simpToKripke sm) && isLocal (simpToKripke sm)
     describe "simpToKripkePointed" $ do
@@ -116,6 +118,8 @@ main = hspec $ do
     describe "kripkeToSimp" $ do
       prop "KrM and SM have same vocabulary" $
         \krm -> vocabOf krm `seteq` vocabOf (kripkeToSimp krm)
+      prop "preserves validity (KrM |= f <-> SM |= f)" $
+        \krm f -> krm |= f == kripkeToSimp krm |= f
     describe "kripkeToSimpPointed" $ do
       prop "KrM and SM have same vocabulary" $
         \krm -> vocabOf krm `seteq` vocabOf (kripkeToSimpPointed krm)
@@ -133,7 +137,7 @@ main = hspec $ do
             internalToActual = snd $ kripkeToSimpWithMap krm
             ws = worldsOf krm
             sm = fst $ kripkeToSimpWithMap krm
-            equivX w = worldToFacet krm internalToActual w
+            equivX = worldToFacet krm internalToActual
           in
             all (\w -> (krm, w) |= f == (sm, equivX w) |= f) ws
 
