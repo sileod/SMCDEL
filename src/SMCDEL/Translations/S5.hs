@@ -446,7 +446,9 @@ kripkeToSimpMultipointed (krm, ws) = (sm, xs) where
 -- | Given a Kripke model and a map from the internal representation to the actual vertex, convert a world to the corresponding facet
 worldToFacet :: KripkeModelS5 -> (([World], Agent) -> Vert) -> World -> Facet
 worldToFacet krm internToAct w = map (internToAct . vert) (agentsOf usedKrm) where
-  usedKrm@(KrMS5 _ usedRel _) = if isLocal krm && isProper krm then krm else makeLocalAndProper krm
+  usedKrm@(KrMS5 _ usedRel _) = if isLocal krm && isProper krm 
+                                  then krm 
+                                  else makeLocalAndProper krm
   vert ag = (fromJust (find (w `elem`) (apply usedRel ag)), ag)
 
 -- | Check whether a given Kripke model is proper
