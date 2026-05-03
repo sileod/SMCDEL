@@ -34,21 +34,22 @@ main :: IO ()
 main = do
   putStrLn $ "SMCDEL " ++ showVersion version ++ " -- https://github.com/jrclogic/SMCDEL"
   port <- fromMaybe 3000 . (readMaybe =<<) <$> lookupEnv "PORT"
+  path <- fromMaybe "/" <$> lookupEnv "WEBPATH"
   putStrLn $ "Please open this link: http://127.0.0.1:" ++ show port ++ "/index.html"
   let mySettings = Options 1 (setHost "127.0.0.1" $ setPort port defaultSettings)
+  let index = html . TL.fromStrict $ addVersionNumber $ embeddedFile "index.html"
   let js = setHeader "Content-Type" "application/javascript; charset=utf-8"
   scottyOpts mySettings $ do
-    get "" $ redirect "index.html"
-    get "/" $ redirect "index.html"
-    get "/index.html" . html . TL.fromStrict $ addVersionNumber $ embeddedFile "index.html"
-    get "/jquery.js"      $ js >> html (TL.fromStrict $ embeddedFile "jquery.js")
-    get "/ace.js"         $ js >> html (TL.fromStrict $ embeddedFile "ace.js")
-    get "/mode-smcdel.js" $ js >> html (TL.fromStrict $ embeddedFile "mode-smcdel.js")
-    get "/viz-lite.js"    $ js >> html (TL.fromStrict $ embeddedFile "viz-lite.js")
-    get "/getExample" $ do
+    get (capture path) index
+    get (capture $ path ++ "index.html") index
+    get (capture $ path ++ "jquery.js")      $ js >> html (TL.fromStrict $ embeddedFile "jquery.js")
+    get (capture $ path ++ "ace.js")         $ js >> html (TL.fromStrict $ embeddedFile "ace.js")
+    get (capture $ path ++ "mode-smcdel.js") $ js >> html (TL.fromStrict $ embeddedFile "mode-smcdel.js")
+    get (capture $ path ++ "viz-lite.js")    $ js >> html (TL.fromStrict $ embeddedFile "viz-lite.js")
+    get (capture $ path ++ "getExample") $ do
       this <- queryParam "filename"
       html . TL.fromStrict $ embeddedFile this
-    post "/check" $ do
+    post (capture $ path ++ "check") $ do
       smcinput <- formParam "smcinput"
       case alexScanTokensSafe smcinput of
         Left pos -> webError Lex (Just pos) []
@@ -65,7 +66,7 @@ main = do
                 [ TL.pack knstring
                 , "<hr />\n"
                 , TL.pack results ]
-    post "/knsToKripke" $ do
+    post (capture $ path ++ "knsToKripke") $ do
       smcinput <- formParam "smcinput"
       case alexScanTokensSafe smcinput of
         Left pos -> webError Lex (Just pos) []
@@ -128,7 +129,6 @@ doJobWeb mykns (WhereQ f) = return (unlines
 doJobWeb mykns (UpdateQ f) = do
   let updatedKns = update mykns f
   let phiTex = texForm (simplify f)
-  let fPhi = "\\( \\mathcal{F}^{(" ++ phiTex ++ ")} \\)"
   updatedStruct <- showStructure Nothing updatedKns
   return (unlines
       ["After updating with \\(" ++ phiTex ++ "\\),"

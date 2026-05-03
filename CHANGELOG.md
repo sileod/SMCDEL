@@ -16,6 +16,7 @@ Changed:
 - Bug fix: in `transformerToActionModelWithG` do not filter
 - Bug fix: in `bddOf` for `Dia` use `unsafeUpdate`
 - Bug fix in HasCacBDD-0.3.0.0: segfault on Apple M1 and ARM
+- Web: use `WEBPATH` for running behind non-rewriting proxy
 
 ## v1.3.0 (2024-04-24)
 
