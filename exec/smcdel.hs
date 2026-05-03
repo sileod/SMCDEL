@@ -11,7 +11,7 @@ import System.Environment (getArgs,getProgName)
 import System.Exit (exitFailure)
 import System.Process (system)
 import System.FilePath.Posix (takeBaseName)
-import System.IO (Handle,hClose,hPutStrLn,stderr,stdout,openTempFile)
+import System.IO (Handle,hClose,hIsTerminalDevice,hPutStrLn,stderr,stdout,openTempFile)
 
 import SMCDEL.Internal.Lex
 import SMCDEL.Internal.Parse
@@ -103,9 +103,10 @@ getInputAndSettings = do
 
 vividPutStrLn :: String -> IO ()
 vividPutStrLn s = do
-  setSGR [SetColor Foreground Vivid White]
+  isTTY <- hIsTerminalDevice stdout
+  when isTTY $ setSGR [SetColor Foreground Vivid Blue]
   putStrLn s
-  setSGR []
+  when isTTY $ setSGR []
 
 infoline :: String
 infoline = "SMCDEL " ++ showVersion version ++ " -- https://github.com/jrclogic/SMCDEL\n"
