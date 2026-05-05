@@ -147,8 +147,10 @@ main = hspec $ do
 exampleSM :: SimplicialModelS5
 exampleSM = SMS5
     [[1, 2, 3], [2, 3, 4]]
-    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a")])
-    (M.fromList [(1, M.fromList [(P 1, True)]), (2, M.fromList [(P 2, True)]), (3, M.fromList [(P 3, False)]), (4, M.fromList [(P 1, False)])])
+    (M.fromList [(1, ("a", M.fromList [(P 1, True)])), 
+                 (2, ("b", M.fromList [(P 2, True)])), 
+                 (3, ("c", M.fromList [(P 3, False)])), 
+                 (4, ("a", M.fromList [(P 1, False)]))])
 
 -- Fig. 4 from proposal, pointing towards facet X (C, X)
 pointedExampleSM :: PointedSimplicialModelS5
@@ -158,13 +160,12 @@ pointedExampleSM = (exampleSM, [1, 2, 3] :: Facet)
 exampleSM2 :: SimplicialModelS5
 exampleSM2 = SMS5
     [[1, 2, 3], [2, 3, 4], [3, 4, 5], [5, 6, 7], [6, 7, 8], [7, 8, 9]]
-    (M.fromList [(1, "a"), (2, "b"), (3, "c"), (4, "a"), (5, "b"), (6, "a"), (7, "c"), (8, "b"), (9, "a")])
-    (M.fromList [(1, M.fromList [(P 1, False)]), 
-                 (2, M.fromList [(P 2, True)]), 
-                 (3, M.fromList [(P 3, True)]), 
-                 (4, M.fromList [(P 1, True)]), 
-                 (5, M.fromList [(P 2, False)]), 
-                 (6, M.fromList [(P 1, True)]), 
-                 (7, M.fromList [(P 3, False)]), 
-                 (8, M.fromList [(P 2, True)]), 
-                 (9, M.fromList [(P 1, False)])])
+    (M.fromList [(1, ("a", M.fromList [(P 1, False)])), 
+                 (2, ("b", M.fromList [(P 2, True)])), 
+                 (3, ("c", M.fromList [(P 3, True)])), 
+                 (4, ("a", M.fromList [(P 1, True)])), 
+                 (5, ("b", M.fromList [(P 2, False)])), 
+                 (6, ("a", M.fromList [(P 1, True)])), 
+                 (7, ("c", M.fromList [(P 3, False)])), 
+                 (8, ("b", M.fromList [(P 2, True)])), 
+                 (9, ("a", M.fromList [(P 1, False)]))])

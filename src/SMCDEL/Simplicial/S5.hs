@@ -29,22 +29,19 @@ type Facet = [Vert] -- TODO: implement as sets
 -- | A simplicial complex is represented by a list of facets
 type SimplicialComplex = [Facet] -- TODO: implement as sets
 
--- | The colouring function Chi is represented by a map from vertices to agents
-type Colours = M.Map Vert Agent
+-- | An assignment is a map from atomic propositions to Booleans
+type Assignment = M.Map Prp Bool
 
--- | A valuation is a map from vertices to explicit assignments (maps from propositions to Booleans)
-type Valuation = M.Map Vert (M.Map Prp Bool)
-
-data SimplicialModelS5 = SMS5 SimplicialComplex Colours Valuation deriving (Eq, Show)
+-- | A simplicial model is a simplicial complex and a map from vertices to pairs
+-- of agents (colour of that vertex) and assignments (valuation of that vertex)  
+data SimplicialModelS5 = SMS5 SimplicialComplex (M.Map Vert (Agent, Assignment))
+    deriving (Eq, Show)
 
 class HasFacets a where
     facetsOf :: a -> [Facet]
 
-instance HasFacets SimplicialComplex where
-    facetsOf sc = sc
-
 instance HasFacets SimplicialModelS5 where
-    facetsOf (SMS5 sc _ _) = sc
+    facetsOf (SMS5 sc _) = sc
 
 class HasVertices a where
     vertsOf :: a -> [Vert]
@@ -53,13 +50,13 @@ instance HasVertices SimplicialComplex where
     vertsOf = foldl' union []
 
 instance HasVertices SimplicialModelS5 where
-    vertsOf (SMS5 sc _ _) = vertsOf sc
-
-instance HasVocab SimplicialModelS5 where
-   vocabOf (SMS5 _ _ val) = nub ((concatMap M.keys . M.elems) val)
+    vertsOf (SMS5 _ verts) = M.keys verts
 
 instance HasAgents SimplicialModelS5 where
-    agentsOf (SMS5 _ col _) = nub (M.elems col)
+    agentsOf (SMS5 _ verts) = nub (map fst (M.elems verts))
+
+instance HasVocab SimplicialModelS5 where
+    vocabOf (SMS5 _ verts) = nub (concatMap (M.keys . snd) (M.elems verts))
 
 instance Pointed SimplicialModelS5 Facet where
 type PointedSimplicialModelS5 = (SimplicialModelS5, Facet)
@@ -70,39 +67,37 @@ type MultipointedSimplicialModelS5 = (SimplicialModelS5, [Facet])
 instance (HasFacets a, Pointed a b) => HasFacets (a, b) where
     facetsOf = facetsOf . fst
 
--- | Get a list of variables that are true in a given vertex
-getLocalVar :: SimplicialModelS5 -> Vert -> [Prp]
-getLocalVar (SMS5 _ _ val) vert = case M.lookup vert val of
-    Nothing -> error "vertex not in SC"
-    Just assigns -> (M.keys . M.filter id) assigns
-
 -- | Get a list of variables that are true in a given facet
-getGlobalVar :: SimplicialModelS5 -> Facet -> [Prp]
-getGlobalVar sm = concatMap (getLocalVar sm)
+trueIn :: SimplicialModelS5 -> Facet -> [Prp]
+trueIn (SMS5 _ verts) = concatMap trueAt where
+    trueAt v = (M.keys . M.filter id) (snd $ verts M.! v)
 
 -- | Get the agent colouring the given vertex in the given model
 agAt :: SimplicialModelS5 -> Vert -> Agent
-agAt (SMS5 _ col _) v = col M.! v
+agAt (SMS5 _ verts) v = fst $ verts M.! v
 
 -- | Get a list of all neighbouring facets where all given agents sit at an intersection
 getRelFacets :: SimplicialModelS5 -> Facet -> [Agent] -> [Facet]
-getRelFacets (SMS5 sc col _) facet ags = filter (\x -> (ags `intersect` map (col M.!) (facet `intersect` x)) == ags) sc
+getRelFacets sm@(SMS5 sc _) facet ags = filter (\x -> ags `subseteq` sharedAgs x) sc where
+    sharedAgs x = map (agAt sm) (facet `intersect` x)
 
--- | Get a list of all facets in which a formula has to be true to be considered common knowledge
+-- | Get a list of all facets in which a formula has to be true to be considered
+-- common knowledge (closure of singleStarB)
 -- See 1.6.1 in [Dit+22] for detailed definition of starB 
-getStarB :: SimplicialModelS5 -> [Facet] -> [Agent] -> [Facet]
-getStarB sm starBs ags
-    | singleStarB sm starBs ags == starBs = starBs -- no new facet added to starB, done
-    | otherwise = getStarB sm (singleStarB sm starBs ags) ags -- new facet(s) added to starB, check once again
+getStarB :: SimplicialModelS5 -> [Agent] -> Facet -> [Facet]
+getStarB sm ags cur = lfp (singleStarB sm ags) [cur]
 
--- | Get a list of all facets where some agent from the given list sits at an intersection of any facet in the given list, including the given facets
-singleStarB :: SimplicialModelS5 -> [Facet] -> [Agent] -> [Facet]
-singleStarB (SMS5 sc col _) cur ags = filter (\x -> any (\y -> not (null (ags `intersect` map (col M.!) (y `intersect` x)))) cur) sc
+-- | Get a list of all facets where some agent from the given list sits at an 
+--  intersection of any facet in the given list, including the given facets
+singleStarB :: SimplicialModelS5 -> [Agent] -> [Facet] -> [Facet]
+singleStarB sm@(SMS5 sc _) ags facets = filter (\x -> any (connectedByAgs x) facets) sc where
+    connectedByAgs f1 f2 = any (`elem` sharedAgs) ags where
+        sharedAgs = map (agAt sm) (f1 `intersect` f2)
 
 eval :: PointedSimplicialModelS5 -> Form -> Bool
 eval _ Top = True
 eval _ Bot = False
-eval (sm, facet) (PrpF p) = p `elem` getGlobalVar sm facet
+eval (sm, facet) (PrpF p) = p `elem` trueIn sm facet
 eval pm (Neg form) = not $ eval pm form
 eval pm (Conj forms)  = all (eval pm) forms
 eval pm (Disj forms)  = any (eval pm) forms
@@ -116,7 +111,7 @@ eval pm (Forall ps f) = eval pm (foldl singleForall f ps) where
 eval pm (Exists ps f) = eval pm (foldl singleExists f ps) where
   singleExists g p = Disj [ substit p Top g, substit p Bot g ]
 eval (sm, cur) (Ck ags form) = all (\x -> eval (sm, x) form) facets where
-    facets = getStarB sm [cur] ags
+    facets = getStarB sm ags cur
 eval (sm, facet) (Dk ags form) = all (\x -> eval (sm, x) form) facets where
     facets = getRelFacets sm facet ags
 eval pm (Kw ag form) = eval pm (K ag form) || eval pm (K ag (Neg form))
@@ -136,52 +131,50 @@ instance Semantics MultipointedSimplicialModelS5 where
     isTrue (sm, xs) form = all (\x -> isTrue (sm, x) form) xs
 
 instance Update SimplicialModelS5 Form where
-    unsafeUpdate sm@(SMS5 sc col val) form = SMS5 newsc newcol newval where
+    unsafeUpdate sm@(SMS5 sc verts) form = SMS5 newsc newverts where
         newsc = filter (\x -> eval (sm, x) form) sc
-        newcol = M.filterWithKey (\k _ -> k `elem` newvert) col
-        newval = M.filterWithKey (\k _ -> k `elem` newvert) val 
-        newvert = vertsOf newsc
+        newverts = M.filterWithKey (\k _ -> k `elem` newkeys) verts
+        newkeys = vertsOf newsc
 
 instance Update PointedSimplicialModelS5 Form where
     unsafeUpdate (sm, x) form = (unsafeUpdate sm form, x)
 
 withoutFacet :: SimplicialModelS5 -> Facet -> SimplicialModelS5
-withoutFacet (SMS5 sc col val) x = SMS5
+withoutFacet (SMS5 sc verts) x = SMS5
     (delete x sc)
-    (M.filterWithKey (\k _ -> k `elem` newVs) col)
-    (M.filterWithKey (\k _ -> k `elem` newVs) val)
+    (M.filterWithKey (\k _ -> k `elem` newKeys) verts)
     where
-        newVs = vertsOf (delete x sc)
+        newKeys = vertsOf (delete x sc)
 
 instance Arbitrary SimplicialModelS5 where
     arbitrary = do
-        let nonActualVerts = [6..30]
-            verts = [1..30]
+        let nonActualVerts = [6..30 :: Vert]
+            verts = [1..30 :: Vert]
         -- colour verts [6..30] randomly
-        nonActualCol <- M.fromList <$> mapM (\v -> do
+        randomVertMap <- M.fromList <$> mapM (\v -> do
             ag <- elements defaultAgents
-            return (v, ag)
+            let prp = P $ read ag - 1
+            ass <- M.singleton prp <$> choose (True, False)
+            return (v, (ag, ass))
             ) nonActualVerts
         -- colour verts [1..5] with respective agent to ensure feasibility of facets
-        let col = M.insert 1 "1" $
-                  M.insert 2 "2" $
-                  M.insert 3 "3" $
-                  M.insert 4 "4" $
-                  M.insert 5 "5" nonActualCol
-        val <- M.fromList <$> mapM (\v -> do
-            let prp = P $ read (col M.! v) - 1
+        semirandomVertMap <- M.fromList <$> mapM (\v -> do
+            let prp = P $ v - 1
+                ag = show v
             ass <- M.singleton prp <$> choose (True, False)
-            return (v,ass)
-            ) verts
-        let containsAllAg facet = all (\ag -> ag `elem` map (col M.!) facet) defaultAgents
-        let facet = sort <$> vectorOf 5 (elements verts) `suchThat` containsAllAg
+            return (v :: Vert, (ag :: Agent, ass))
+            ) [1..5]
+        let vertMapAll = randomVertMap `M.union` semirandomVertMap
+            containsAllAg x = all (\ag -> ag `elem` map (fst . (vertMapAll M.!)) x) defaultAgents
+            facet = sort <$> vectorOf 5 (elements verts) `suchThat` containsAllAg
             connected sc = 
                 length sc == 1 || 
                 all (\f1 -> any (\f2 -> f1 `intersect` f2 /= []) (delete f1 sc)) sc
         sc <- (nub <$> resize 9 (listOf1 facet)) `suchThat` connected
-        return $ SMS5 sc col val
+        let vertMap = M.filterWithKey (\k _ -> k `elem` vertsOf sc) vertMapAll
+        return $ SMS5 sc vertMap
     -- shrink might break connectivity!
-    shrink sm@(SMS5 sc _ _) = 
+    shrink sm@(SMS5 sc _) = 
         [ sm `withoutFacet` x | x <- sc, not (null $ delete x sc) ]
 
 instance {-# OVERLAPPING #-} Arbitrary PointedSimplicialModelS5 where

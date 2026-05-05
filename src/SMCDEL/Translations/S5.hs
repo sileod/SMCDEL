@@ -377,7 +377,7 @@ actionToEventMulti (actm, curActions) = (trf, curActionsLaw) where
 
 -- | Convert a simplicial model to a Kripke model
 simpToKripke :: SimplicialModelS5 -> KripkeModelS5
-simpToKripke sm@(SMS5 _ _ sval) = KrMS5 worlds rel val where
+simpToKripke sm@(SMS5 _ verts) = KrMS5 worlds rel val where
   worlds = take (length (facetsOf sm)) [1..]
   rel = [(ag, findPartition ag) | ag <- agentsOf sm]
   val = [(world, findAssignment world) | world <- worlds]
@@ -386,9 +386,9 @@ simpToKripke sm@(SMS5 _ _ sval) = KrMS5 worlds rel val where
         | length (foldr union [] eqClasses) == length (facetsOf sm) = eqClasses -- all equivalence classes found
         | otherwise = helper (findEquivalenceClass (head remainingWorlds) : eqClasses) where
           findEquivalenceClass x = map (+ 1) (mapMaybe (`elemIndex` facetsOf sm) (getRelFacets sm x [ag]))
-          remainingWorlds = facetsOf sm \\ map worldToFacet (foldr union [] eqClasses)
-  findAssignment w = concatMap (M.toList . (sval M.!)) (worldToFacet w) -- order not preserved (reversed)
-  worldToFacet w = facetsOf sm !! (w - 1)
+          remainingWorlds = facetsOf sm \\ map toFacet (foldr union [] eqClasses)
+  findAssignment w = concatMap (M.toList . snd . (verts M.!)) (toFacet w) -- order not preserved (reversed)
+  toFacet w = facetsOf sm !! (w - 1)
 
 -- | Convert a pointed simplicial model to a pointed Kripke model
 simpToKripkePointed :: PointedSimplicialModelS5 -> PointedModelS5
@@ -415,16 +415,15 @@ kripkeToSimp krm = fst $ kripkeToSimpWithMap krm
 -- (i.e. sets of local vars \(P_i\) not mutually disjoint)
 kripkeToSimpWithMap :: KripkeModelS5 -> (SimplicialModelS5, ([World], Agent) -> Vert)
 kripkeToSimpWithMap krm@(KrMS5 ws rel val)
-  | isProper krm && isLocal krm = (SMS5 sc col sval, internalToActual)
+  | isProper krm && isLocal krm = (SMS5 sc vertMap, internalToActual)
   | otherwise = kripkeToSimpWithMap $ makeLocalAndProper krm
   where
     vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) rel -- [([World], Agent)]
     internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
-    actualToInternal v = vertInternal !! (v - 1)
     sc = map (worldToFacet krm internalToActual) ws
-    col = M.fromList $ map (\v -> (internalToActual v, snd v)) vertInternal
-    sval = M.mapWithKey (\k ag -> M.fromList (map (\p -> (p, pInV k p)) (localPs ag))) col
-    pInV v = apply (apply val (head $ fst (actualToInternal v)))
+    vertMap = M.fromList $ map (\v -> (internalToActual v, (snd v, ass v))) vertInternal
+    ass vInt = M.fromList $ map (\p -> (p, pInV vInt p)) (localPs (snd vInt))
+    pInV vInt = apply (apply val (head $ fst vInt))
     localPs ag = filter (\p -> isLocalVarForAg krm p ag) (vocabOf krm)
 
 -- | Convert a pointed Kripke model to a pointed simplicial model
