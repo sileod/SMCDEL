@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as M
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
+import Data.Dynamic
 
 import SMCDEL.Language
 import SMCDEL.Simplicial.S5
@@ -29,6 +30,23 @@ main = hspec $ do
       pointedExampleSM |= PubAnnounce (PrpF (P 1)) (Ck ["a", "b", "c"] (PrpF (P 1)))
     it "C', X: p_c is not common knowledge among all ag" $
       not $ (exampleSM2, [1, 2, 3] :: Facet) |= Ck ["a", "b", "c"] (PrpF (P 3))
+    describe "simplicial action models (examples from [Dit+22, p. 39-40])" $ do
+      it "ex28: before update, it is not valid that c knows that a doesn't know whether p_c" $
+        not $ ex28SM |= K "c" (Neg (K "a" (PrpF (P 3))) `conj` Neg (K "a" (Neg (PrpF (P 3)))))
+      it "ex28: after update, it is valid that c knows that a doesn't know whether p_c" $ 
+        ex28SMxAM |= K "c" (Neg (K "a" (PrpF (P 3))) `conj` Neg (K "a" (Neg (PrpF (P 3)))))
+      it "ex28: after update, it is valid that b doesn't know whether p_c" $
+        ex28SMxAM |= Neg (K "b" (PrpF (P 3)) `disj` K "b" (Neg (PrpF (P 3))))
+      it "ex28: after update, but it is valid that b knows that c knows whether p_b" $
+        ex28SMxAM |= K "b" (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))
+      it "ex28: 'before the update c did not know the value of b's variable, but afterwards she knows' (using Dia)" $
+        ex28PointedSM |=
+          Conj [ Neg (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))
+               , Dia (Dyn "(ex28AM, [2, 3, 4])" (toDyn ex28PointedAM)) (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2)))) ]
+      it "ex29: before update, it is not valid that p_c is common knowledge" $
+        ex29SM |= Neg (Ck ["a", "b", "c"] (PrpF (P 3)))
+      it "ex29: after update, it is valid that p_c is common knowledge" $
+        ex29SMxAM |= Ck ["a", "b", "c"] (PrpF (P 3))
   describe "sanity and property checks for randomly generated simplicial models" $ do
     prop "generating models works without hanging forever" $
       \m -> withMaxSuccess 10000 $ within 5000 $ (m :: SimplicialModelS5) |= Top
@@ -147,10 +165,10 @@ main = hspec $ do
 exampleSM :: SimplicialModelS5
 exampleSM = SMS5
     [[1, 2, 3], [2, 3, 4]]
-    (M.fromList [(1, ("a", M.fromList [(P 1, True)])), 
-                 (2, ("b", M.fromList [(P 2, True)])), 
-                 (3, ("c", M.fromList [(P 3, False)])), 
-                 (4, ("a", M.fromList [(P 1, False)]))])
+    (M.fromList [ (1, ("a", M.fromList [(P 1, True)]))
+                , (2, ("b", M.fromList [(P 2, True)]))
+                , (3, ("c", M.fromList [(P 3, False)])) 
+                , (4, ("a", M.fromList [(P 1, False)]))])
 
 -- Fig. 4 from proposal, pointing towards facet X (C, X)
 pointedExampleSM :: PointedSimplicialModelS5
@@ -160,12 +178,67 @@ pointedExampleSM = (exampleSM, [1, 2, 3] :: Facet)
 exampleSM2 :: SimplicialModelS5
 exampleSM2 = SMS5
     [[1, 2, 3], [2, 3, 4], [3, 4, 5], [5, 6, 7], [6, 7, 8], [7, 8, 9]]
-    (M.fromList [(1, ("a", M.fromList [(P 1, False)])), 
-                 (2, ("b", M.fromList [(P 2, True)])), 
-                 (3, ("c", M.fromList [(P 3, True)])), 
-                 (4, ("a", M.fromList [(P 1, True)])), 
-                 (5, ("b", M.fromList [(P 2, False)])), 
-                 (6, ("a", M.fromList [(P 1, True)])), 
-                 (7, ("c", M.fromList [(P 3, False)])), 
-                 (8, ("b", M.fromList [(P 2, True)])), 
-                 (9, ("a", M.fromList [(P 1, False)]))])
+    (M.fromList [ (1, ("a", M.fromList [(P 1, False)]))
+                , (2, ("b", M.fromList [(P 2, True)])) 
+                , (3, ("c", M.fromList [(P 3, True)])) 
+                , (4, ("a", M.fromList [(P 1, True)])) 
+                , (5, ("b", M.fromList [(P 2, False)])) 
+                , (6, ("a", M.fromList [(P 1, True)])) 
+                , (7, ("c", M.fromList [(P 3, False)])) 
+                , (8, ("b", M.fromList [(P 2, True)])) 
+                , (9, ("a", M.fromList [(P 1, False)])) ])
+
+-- Example 28 in [Dit+22, p. 39], without factual change
+ex28SM :: SimplicialModelS5
+ex28SM = SMS5 
+    [[1, 2, 3], [2, 3, 5], [2, 4, 5], [3, 5, 6]] 
+    (M.fromList [ (1, ("c", M.singleton (P 3) False))
+                , (2, ("b", M.singleton (P 2) True ))
+                , (3, ("a", M.singleton (P 1) True )) 
+                , (4, ("a", M.singleton (P 1) False)) 
+                , (5, ("c", M.singleton (P 3) True ))
+                , (6, ("b", M.singleton (P 2) False)) ])
+
+ex28AM :: SimplicialActionModelS5
+ex28AM = SActMS5 
+    [[1, 2, 3], [2, 3, 4]] 
+    (M.fromList [ (1, ( "c" 
+                      , Neg (PrpF (P 3))
+                      , M.empty))
+                , (2, ( "b"
+                      , Neg (disj (K "b" (PrpF (P 3))) (K "b" (Neg (PrpF (P 3)))))
+                      , M.empty))
+                , (3, ( "a"
+                      , Neg (disj (K "a" (PrpF (P 3))) (K "a" (Neg (PrpF (P 3)))))
+                      , M.empty))
+                , (4, ( "c"
+                      , PrpF (P 3)
+                      , M.empty)) ])
+
+ex28SMxAM :: SimplicialModelS5
+ex28SMxAM = ex28SM `update` ex28AM
+
+ex28PointedSM :: PointedSimplicialModelS5
+ex28PointedSM = (ex28SM, [2, 3, 5] :: Facet)
+
+ex28PointedAM :: PointedSimplicialActionModelS5
+ex28PointedAM = (ex28AM, [2, 3, 4] :: Facet)
+
+-- Example 29 in [Dit+22, p. 40], with factual change
+ex29SM :: SimplicialModelS5
+ex29SM = SMS5
+    [[1, 2, 3], [2, 3, 4]]
+    (M.fromList [ (1, ("c", M.singleton (P 3) False))
+                , (2, ("b", M.singleton (P 2) True ))
+                , (3, ("a", M.singleton (P 1) True ))
+                , (4, ("c", M.singleton (P 3) True )) ])
+
+ex29AM :: SimplicialActionModelS5
+ex29AM = SActMS5
+    [[1, 2, 3]] 
+    (M.fromList [ (1, ("c", Top, M.singleton (P 3) Top))
+                , (2, ("b", Top, M.empty))
+                , (3, ("a", Top, M.empty)) ])
+
+ex29SMxAM :: SimplicialModelS5
+ex29SMxAM = ex29SM `update` ex29AM
