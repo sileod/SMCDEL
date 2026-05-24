@@ -18,9 +18,11 @@ import qualified Data.Map.Strict as M
 import Test.QuickCheck
 import Data.Maybe
 import Data.Dynamic
+import Control.Arrow
 
 import SMCDEL.Language
 import SMCDEL.Internal.Help
+import SMCDEL.Internal.TexDisplay
 
 -- | A vertex is represented by an integer
 type Vert = Int
@@ -37,7 +39,7 @@ type Assignment = M.Map Prp Bool
 -- | A simplicial model is a simplicial complex and a map from vertices to pairs
 -- of agents (colour of that vertex) and assignments (valuation of that vertex)  
 data SimplicialModelS5 = SMS5 SimplicialComplex (M.Map Vert (Agent, Assignment))
-    deriving (Eq, Show)
+    deriving (Eq, Show, Ord)
 
 class HasFacets a where
     facetsOf :: a -> [Facet]
@@ -330,3 +332,24 @@ True
 >>> ex29SMxAM
 SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,True)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))])
 -}
+
+-- * Visualization
+
+-- Visualize a simplicial model in 2D
+
+instance KripkeLike SimplicialModelS5 where
+    directed = const False
+    getNodes sm@(SMS5 sc verts) = map (show &&& labelOf) (vertsOf sm) where
+        labelOf v = "$ " ++ (agAt sm v) ++ " $" ++ ", " ++ tex (snd (verts M.! v))
+    getEdges (SMS5 sc verts) = nub [ ("", show x, show y) | facet <- sc, x <- facet, y <- facet, x < y]
+
+instance TexAble SimplicialModelS5 where
+  tex           = tex.ViaDot
+  texTo         = texTo.ViaDot
+  texDocumentTo = texDocumentTo.ViaDot
+
+-- | TeXing assignments including negations
+instance TexAble a => TexAble (M.Map a Bool) where
+  tex ass = case M.toList ass of
+    [] -> ""
+    ps -> "$" ++ intercalate "," (map (\(p, a) -> if a then tex p else " \\overline{" ++ tex p ++ "} ") ps) ++ "$"
