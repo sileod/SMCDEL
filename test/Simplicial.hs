@@ -12,6 +12,7 @@ import SMCDEL.Simplicial.S5
 import SMCDEL.Translations.S5
 import SMCDEL.Internal.Help
 import SMCDEL.Explicit.S5
+import SMCDEL.Examples.MuddyChildren
 
 main :: IO ()
 main = hspec $ do
@@ -47,6 +48,19 @@ main = hspec $ do
         ex29SM |= Neg (Ck ["a", "b", "c"] (PrpF (P 3)))
       it "ex29: after update, it is valid that p_c is common knowledge" $
         ex29SMxAM |= Ck ["a", "b", "c"] (PrpF (P 3))
+    describe "muddy children with three children, all muddy" $ do
+      it "initially, nobody knows whether they are muddy" $
+        mudSimp33 |= nobodyknows 3
+      it "after the father's announement, still nobody knows whether they are muddy" $
+        mudSimp33 |= PubAnnounce (father 3) (nobodyknows 3)
+      it "after the first question, still nobody knows whether they are muddy" $ 
+        mudSimp33 |= PubAnnounce (father 3) 
+                                 (PubAnnounce (nobodyknows 3) (nobodyknows 3))
+      it "after the second question, everybody knows whether they are muddy" $ 
+        mudSimp33 |= PubAnnounce (father 3) 
+                                 (PubAnnounce (nobodyknows 3) 
+                                              (PubAnnounce (nobodyknows 3) 
+                                                           (Conj [ knows i | i <- [1..3] ])))
   describe "sanity and property checks for randomly generated simplicial models" $ do
     prop "generating models works without hanging forever" $
       \m -> withMaxSuccess 10000 $ within 5000 $ (m :: SimplicialModelS5) |= Top
@@ -242,3 +256,22 @@ ex29AM = SActMS5
 
 ex29SMxAM :: SimplicialModelS5
 ex29SMxAM = ex29SM `update` ex29AM
+
+-- Muddy Children with 3 children, all muddy
+
+mudSimp33 :: PointedSimplicialModelS5
+mudSimp33 = 
+  (SMS5 [ [1,5,9], [2,6,9], [3,5,10], [4,6,10], [1,7,11], [2,8,11], [3,7,12], [4,8,12] ]
+       (M.fromList [ ( 1, ("1", M.fromList [(P 2,False)]))
+                   , ( 2, ("1", M.fromList [(P 2,False)]))
+                   , ( 3, ("1", M.fromList [(P 2,True)]))
+                   , ( 4, ("1", M.fromList [(P 2,True)]))
+                   , ( 5, ("2", M.fromList [(P 3,False)]))
+                   , ( 6, ("2", M.fromList [(P 3,True)]))
+                   , ( 7, ("2", M.fromList [(P 3,False)]))
+                   , ( 8, ("2", M.fromList [(P 3,True)]))
+                   , ( 9, ("3", M.fromList [(P 1,False)]))
+                   , (10, ("3", M.fromList [(P 1,False)]))
+                   , (11, ("3", M.fromList [(P 1,True)]))
+                   , (12, ("3", M.fromList [(P 1,True)]))])
+    , [4,8,12] :: Facet)
