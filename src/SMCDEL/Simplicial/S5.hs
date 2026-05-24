@@ -17,6 +17,7 @@ import Data.List
 import qualified Data.Map.Strict as M
 import Test.QuickCheck
 import Data.Maybe
+import Data.Dynamic
 
 import SMCDEL.Language
 import SMCDEL.Internal.Help
@@ -122,7 +123,9 @@ eval pm (Ckw ag form) = eval pm (Ck ag form) || eval pm (Ck ag (Neg form))
 eval pm (Dkw ags form) = eval pm (Dk ags form) || eval pm (Dk ags (Neg form))
 eval (sm, _) (G form) = isTrue sm form
 eval pm (PubAnnounce form1 form2) = not (eval pm form1) || eval (update pm form1) form2
-eval _ (Dia _ _) = undefined -- TODO
+eval pm (Dia (Dyn dynLabel d) f) = case fromDynamic d of
+    Just psactm -> not (eval pm (preOf (psactm :: PointedSimplicialActionModelS5))) || eval (pm `update` psactm) f
+    Nothing -> error $ "cannot update S5 simplicial model with '" ++ dynLabel ++ "':\n  " ++ show d
 
 instance Semantics SimplicialModelS5 where
     isTrue sm form = all (\x -> eval (sm, x) form) (facetsOf sm)
@@ -205,7 +208,7 @@ type PostCondition = M.Map Prp Form
 
 data SimplicialActionModelS5 = SActMS5
     SimplicialComplex
-    (M.Map Vert (Agent, (Form, PostCondition)))
+    (M.Map Vert (Agent, Form, PostCondition))
     deriving (Eq, Ord, Show)
 
 instance HasFacets SimplicialActionModelS5 where
@@ -215,55 +218,115 @@ instance HasVertices SimplicialActionModelS5 where
     vertsOf (SActMS5 _ verts) = M.keys verts
 
 instance HasColours SimplicialActionModelS5 where
-    agAt (SActMS5 _ verts) v = fst $ verts M.! v
+    agAt (SActMS5 _ verts) v = fst3 $ verts M.! v
+
+instance Pointed SimplicialActionModelS5 Facet where
+type PointedSimplicialActionModelS5 = (SimplicialActionModelS5, Facet)
 
 instance HasPrecondition SimplicialActionModelS5 where
     preOf _ = Top
 
 instance HasPrecondition (SimplicialActionModelS5, Vert) where
-    preOf (SActMS5 _ verts, v) = fst $ snd $ verts M.! v
+    preOf (SActMS5 _ verts, v) = snd3 $ verts M.! v
 
 instance HasPrecondition (SimplicialActionModelS5, Facet) where
     preOf (am, facet) = Conj $ map (\v -> preOf (am, v)) facet
 
 instance Update SimplicialModelS5 SimplicialActionModelS5 where
-    unsafeUpdate sm@(SMS5 _ vertMapSM) am@(SActMS5 _ vertMapAM) =  SMS5 sc newVertMap where
-        newFacetsInternal = [[(v, v') |
-                                v <- facetSM, v' <- facetAM, agAt sm v == agAt am v'] |
-                                   facetSM <- facetsOf sm,
-                                   facetAM <- facetsOf am,
-                                   (sm, facetSM) |= preOf (am, facetAM)]
+    unsafeUpdate sm am = 
+        fst $ (sm, head (facetsOf sm)) `update` (am, head (facetsOf am))
+
+instance Update PointedSimplicialModelS5 PointedSimplicialActionModelS5 where
+    unsafeUpdate (sm@(SMS5 _ vertMapSM), curSM) (am@(SActMS5 _ vertMapAM), curAM) =  (SMS5 newsc newVertMap, newcur) where
+        newFacetsInternal = [ [(v, v') | v <- facetSM, v' <- facetAM, agAt sm v == agAt am v'] 
+                            | facetSM <- facetsOf sm
+                            , facetAM <- facetsOf am
+                            , (sm, facetSM) |= preOf (am, facetAM)]
         newVertsInternal = nub $ concat newFacetsInternal
         newVerts = take (length newVertsInternal) [(1 :: Vert)..]
-        intToAct vInt = fromJust (vInt `elemIndex` newVertsInternal) + 1
-        sc = map (map intToAct) newFacetsInternal
+        pairToInt vPair = fromJust (vPair `elemIndex` newVertsInternal) + 1
+        newsc = map (map pairToInt) newFacetsInternal
         newVertMap = M.fromList $ map (\v -> (v, (agAt sm (vSM v), ass (vSM v) (vAM v)))) newVerts where
             vSM v = fst $ newVertsInternal !! (v - 1)
             vAM v = snd $ newVertsInternal !! (v - 1)
         ass vSM vAM = M.fromList $ map (\p -> (p, isTrue (sm, vSM) (post vAM p))) (localPs vSM)
         localPs vSM = M.keys $ snd $ vertMapSM M.! vSM
-        post vAM prp = snd (snd (vertMapAM M.! vAM)) M.! prp
+        post vAM prp = case M.lookup prp $ thd3 (vertMapAM M.! vAM) of
+            Nothing -> PrpF prp
+            Just this -> this
+        newcur = [ pairToInt (v, v') | v <- curSM, v' <- curAM, agAt sm v == agAt am v' ]
 
--- Example 28 in [Dit+22] (p. 39)
+-- Example 28 in [Dit+22, p. 39], without factual change
 ex28SM :: SimplicialModelS5
 ex28SM = SMS5 
     [[1, 2, 3], [2, 3, 5], [2, 4, 5], [3, 5, 6]] 
-    (M.fromList [(1, ("c", M.singleton (P 3) False)), 
-                 (2, ("b", M.singleton (P 2) True)), 
-                 (3, ("a", M.singleton (P 1) True)), 
-                 (4, ("a", M.singleton (P 1) False)), 
-                 (5, ("c", M.singleton (P 3) True)), 
-                 (6, ("b", M.singleton (P 2) False))])
+    (M.fromList [ (1, ("c", M.singleton (P 3) False))
+                , (2, ("b", M.singleton (P 2) True ))
+                , (3, ("a", M.singleton (P 1) True )) 
+                , (4, ("a", M.singleton (P 1) False)) 
+                , (5, ("c", M.singleton (P 3) True ))
+                , (6, ("b", M.singleton (P 2) False)) ])
 
 ex28AM :: SimplicialActionModelS5
 ex28AM = SActMS5 
     [[1, 2, 3], [2, 3, 4]] 
-    (M.fromList [(1, ("c", (Neg (PrpF (P 3)), M.singleton (P 3) (PrpF (P 3))))),
-                 (2, ("b", (Neg (disj (K "b" (PrpF (P 3))) (K "b" (Neg (PrpF (P 3))))), M.singleton (P 2) (PrpF (P 2))))),
-                 (3, ("a", (Neg (disj (K "a" (PrpF (P 3))) (K "a" (Neg (PrpF (P 3))))), M.singleton (P 1) (PrpF (P 1))))),
-                 (4, ("c", (PrpF (P 3), M.singleton (P 3) (PrpF (P 3)))))])
+    (M.fromList [ (1, ( "c" 
+                      , Neg (PrpF (P 3))
+                      , M.empty))
+                , (2, ( "b"
+                      , Neg (disj (K "b" (PrpF (P 3))) (K "b" (Neg (PrpF (P 3)))))
+                      , M.empty))
+                , (3, ( "a"
+                      , Neg (disj (K "a" (PrpF (P 3))) (K "a" (Neg (PrpF (P 3)))))
+                      , M.empty))
+                , (4, ( "c"
+                      , PrpF (P 3)
+                      , M.empty)) ])
+
+ex28SMxAM :: SimplicialModelS5
+ex28SMxAM = ex28SM `update` ex28AM
+
+ex28PointedSM :: PointedSimplicialModelS5
+ex28PointedSM = (ex28SM, [2, 3, 5] :: Facet)
+
+ex28PointedAM :: PointedSimplicialActionModelS5
+ex28PointedAM = (ex28AM, [2, 3, 4] :: Facet)
+
+ex28PointedSMxAM :: PointedSimplicialModelS5
+ex28PointedSMxAM = ex28PointedSM `update` ex28PointedAM
+
+-- Example 29 in [Dit+22, p. 40], with factual change
+ex29SM :: SimplicialModelS5
+ex29SM = SMS5
+    [[1, 2, 3], [2, 3, 4]]
+    (M.fromList [ (1, ("c", M.singleton (P 3) False))
+                , (2, ("b", M.singleton (P 2) True ))
+                , (3, ("a", M.singleton (P 1) True ))
+                , (4, ("c", M.singleton (P 3) True )) ])
+
+ex29AM :: SimplicialActionModelS5
+ex29AM = SActMS5
+    [[1, 2, 3]] 
+    (M.fromList [ (1, ("c", Top, M.singleton (P 3) Top))
+                , (2, ("b", Top, M.empty))
+                , (3, ("a", Top, M.empty)) ])
+
+ex29SMxAM :: SimplicialModelS5
+ex29SMxAM = ex29SM `update` ex29AM
 
 {-
->>> update ex28SM ex28AM
+>>> ex28SMxAM
 SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,False)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))])
+
+>>> ex28PointedSMxAM
+(SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,False)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))]),[2,3,4])
+
+>>> ex28PointedSMxAM |= K "b" (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))
+True
+
+>>> ex28PointedSM |= (Dia (Dyn "(ex28AM, [2, 3, 4])" (toDyn ex28PointedAM)) (K "b" (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))))
+True
+
+>>> ex29SMxAM
+SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,True)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))])
 -}

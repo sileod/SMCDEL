@@ -2,7 +2,8 @@ module SMCDEL.Internal.Help (
   alleq,alleqWith,anydiff,anydiffWith,alldiff,
   groupSortWith,
   apply,(!),set,applyPartial,(!=),
-  powerset,restrict,rtc,tc,Rel,Erel,bl,fusion,intersection,seteq,subseteq,lfp
+  powerset,restrict,rtc,tc,Rel,Erel,bl,fusion,intersection,seteq,subseteq,lfp,
+  fst3, snd3, thd3
   ) where
 import Data.List ((\\),foldl',groupBy,sort,sortBy,union,intersect,nub)
 import Data.Containers.ListUtils (nubOrd)
@@ -140,3 +141,17 @@ binaryIntersection e f = nub [ sort res | x <- e, y <- f,
 intersection :: Ord a => [a] -> [Erel a] -> Erel a
 intersection u [] = [u]
 intersection _ l = foldr1 binaryIntersection l
+
+-- * Triples
+
+-- | Extract first
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+-- | Extract second
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
+
+-- | Extract first
+thd3 :: (a, b, c) -> c
+thd3 (_, _, c) = c
