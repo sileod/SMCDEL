@@ -18,15 +18,11 @@
       ylabel=seconds, ymode=log, ymax=3000,
       xlabel=no. of children (all muddy),
       unbounded coords=jump]
-      \addlegendentry{Triangle}        \addplot table[y=Triangle] from \datatable;
-      \addlegendentry{CacBDD}          \addplot table[y=CacBDD] from \datatable;
-      \addlegendentry{DD}              \addplot table[y=DD] from \datatable;
-      \addlegendentry{CUDD}            \addplot table[y=CUDD] from \datatable;
-      \addlegendentry{CUDDz}           \addplot table[y=CUDDz] from \datatable;
-      \addlegendentry{K (CacBDD)}      \addplot table[y=K] from \datatable;
+      \addlegendentry{build KrM}       \addplot table[y=MudKrpInit] from \datatable;
+      \addlegendentry{build SM}        \addplot table[y=MudSimpInit] from \datatable;
+      \addlegendentry{Simplicial}      \addplot table[y=Simp] from \datatable;
+      \addlegendentry{Kripke}          \addplot table[y=ExpS5] from \datatable;
       \addlegendentry{DEMO-S5}         \addplot table[y=DEMOS5] from \datatable;
-      \addlegendentry{Trans (CacBDD)}  \addplot table[y=Trans] from \datatable;
-      \addlegendentry{TransK (CacBDD)} \addplot table[y=TransK] from \datatable;
     \end{axis}
   \end{tikzpicture}
   \caption{Results.}

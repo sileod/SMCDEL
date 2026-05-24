@@ -35,6 +35,7 @@ import Data.Csv
 import Data.Function
 import Data.List
 import Data.List.Split
+import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Scientific
 import qualified Data.Vector as V
@@ -52,11 +53,7 @@ import qualified SMCDEL.Translations.S5
 import qualified SMCDEL.Translations.K
 import qualified SMCDEL.Other.MCTRIANGLE
 import qualified SMCDEL.Symbolic.K
-
-#ifdef WITH_CUDD
-import SMCDEL.Internal.MyHaskCUDD
-import qualified SMCDEL.Symbolic.S5_CUDD
-#endif
+import qualified SMCDEL.Simplicial.S5
 
 -- | The formula to be checked.
 checkForm :: Int -> Int -> Form
@@ -83,18 +80,6 @@ findNumberCacBDD = findNumberWith (cacMudScnInit,SMCDEL.Symbolic.S5.evalViaBdd) 
 findNumberDD :: Int -> Int -> Int
 findNumberDD = findNumberWith (ddMudScnInit,SMCDEL.Symbolic.S5_DD.evalViaBdd) where
   ddMudScnInit n m = ( SMCDEL.Symbolic.S5_DD.KnS (mudPs n) (SMCDEL.Symbolic.S5_DD.boolBddOf Top) [ (show i,delete (P i) (mudPs n)) | i <- [1..n] ], mudPs m )
-
-#ifdef WITH_CUDD
-findNumberCUDD :: Manager -> Int -> Int -> Int
-findNumberCUDD mgr n m =
-  let cuddMudScnInit = ( SMCDEL.Symbolic.S5_CUDD.KnS mgr (mudPs n) (SMCDEL.Symbolic.S5_CUDD.boolDdOf mgr Top :: Dd B O1 I1) [ (show i, delete (P i) (mudPs n)) | i <- [1..n] ], mudPs m )
-  in findNumberWith (const $ const cuddMudScnInit, SMCDEL.Symbolic.S5_CUDD.evalViaDd) n m
-
-findNumberCUDDz :: Manager -> Int -> Int -> Int
-findNumberCUDDz mgr n m =
-  let cuddMudScnInit = ( SMCDEL.Symbolic.S5_CUDD.KnS mgr (mudPs n) (SMCDEL.Symbolic.S5_CUDD.boolDdOf mgr Top :: Dd Z O1 I1) [ (show i, delete (P i) (mudPs n)) | i <- [1..n] ], mudPs m )
-  in findNumberWith (const $ const cuddMudScnInit, SMCDEL.Symbolic.S5_CUDD.evalViaDd) n m
-#endif
 
 findNumberTrans :: Int -> Int -> Int
 findNumberTrans = findNumberWith (start,SMCDEL.Symbolic.S5.evalViaBdd) where
@@ -144,6 +129,52 @@ findNumberDemoS5 n m = findNumberDemoLoop 0 start where
       then findNumberDemoLoop (count+1) (DEMO_S5.updPa curMod (DEMO_S5.dont n))
       else count
 
+findNumberExp :: Int -> Int -> Int
+findNumberExp n m = findNumberKrpLoop 0 start where
+  start = update (mudKrpInit n m) (father n)
+  findNumberKrpLoop count curMod =
+    if SMCDEL.Explicit.S5.eval curMod (nobodyknows n)
+      then findNumberKrpLoop (count + 1) (update curMod (nobodyknows n))
+      else count
+
+mudSimpInit :: Int -> Int -> SMCDEL.Simplicial.S5.PointedSimplicialModelS5
+mudSimpInit n m = (sm, cur) where
+  sm = SMCDEL.Simplicial.S5.SMS5 sc verts
+  sc = map (\x -> map (findV x) agsInt) [0.. (2^n) - 1] where
+    agsInt = [(1 :: Int)..n]
+    findV :: Int -> Int -> Int
+    findV x ag = actualV $ (x `mod` step) + (x `div` (2 ^ (n - (ag - 1))) * step) + 1 where
+      step = 2^(n - ag)
+      actualV i = (ag - 1) * 2^(n - 1) + i
+  verts = M.fromList $ map (\v -> (v, (col v, val v))) vertsInt where
+    vertsInt = [(1 :: SMCDEL.Simplicial.S5.Vert) .. 2^(n - 1) * n]
+    col v = show $ ((v - 1) `div` (2^(n - 1))) + 1
+    val v = M.singleton (P observedAg) assignment where
+      ag = read (col v)
+      observedAg = (ag `mod` n) + 1
+      assignment = odd (((v - 1) `mod` 2^(n-1)) `div` step)
+      step = case observedAg of
+        1 -> 2^(n - 2)
+        _ -> 2^(n - 1 - ag)
+  cur =
+    case filter (\x -> length (SMCDEL.Simplicial.S5.trueIn sm x) == m) sc of
+      (x : _) -> x
+      _ -> error "No current state found"
+
+findNumberSimp :: Int -> Int -> Int
+findNumberSimp n m = findNumberSimpLoop 0 start where
+  start = update (mudSimpInit n m) (father n)
+  findNumberSimpLoop count curMod =
+    if SMCDEL.Simplicial.S5.eval curMod (nobodyknows n)
+      then findNumberSimpLoop (count + 1) (update curMod (nobodyknows n))
+      else count
+
+-- | Silly function used for comparing time needed to build initial simplicial model 
+mudSimpInitH n m = length $ SMCDEL.Simplicial.S5.facetsOf $ mudSimpInit n m
+
+-- | Silly function used for comparing time needed to build initial Kripke model 
+mudKrpInitH n m = length $ SMCDEL.Explicit.S5.worldsOf $ mudKrpInit n m
+
 -- | Solve the puzzle with the number triangle approach.
 -- See "SMCDEL.Other.MCTRIANGLE" for the details.
 -- Note that here the formula \texttt{nobodyknows} does not depend on the number of agents.
@@ -165,21 +196,18 @@ main = prepareMain >> benchMain >> convertMain
 
 benchMain :: IO ()
 benchMain = do
-#ifdef WITH_CUDD
-  mgr <- makeManagerZ 40 -- one CUDD manager for BDDs and ZDDs
-#endif
   defaultMainWith myConfig (map mybench
-    [ ("Triangle"  , findNumberTriangle  , [7..40] )
-    , ("CacBDD"    , findNumberCacBDD    , [3..40] )
-#ifdef WITH_CUDD
-    , ("CUDD"      , findNumberCUDD mgr  , [3..40] )
-    , ("CUDDz"     , findNumberCUDDz mgr , [3..40] )
-#endif
-    , ("DD"        , findNumberDD        , [3..30] )
-    , ("K"         , findNumberK         , [3..12] )
-    , ("DEMOS5"    , findNumberDemoS5    , [3..12] )
-    , ("Trans"     , findNumberTrans     , [3..12] )
-    , ("TransK"    , findNumberTransK    , [3..10] ) ])
+    [ ("Triangle"    , findNumberTriangle  , [7..7] )
+    , ("CacBDD"      , findNumberCacBDD    , [3..40] )
+    , ("DD"          , findNumberDD        , [3..30] )
+    , ("K"           , findNumberK         , [3.. 7] )
+    , ("ExpS5"       , findNumberExp       , [3..12] )    
+    , ("DEMOS5"      , findNumberDemoS5    , [3..12] )
+    , ("Trans"       , findNumberTrans     , [3..12] )
+    , ("TransK"      , findNumberTransK    , [3..12] ) 
+    , ("Simp"        , findNumberSimp      , [3..12] )
+    , ("MudKrpInit"  , mudKrpInitH         , [3..12] )    
+    , ("MudSimpInit" , mudSimpInitH        , [3..12] ) ])
   where
     mybench (name,f,range) = bgroup name $ map (run f) range
     run f k = bench (show k) $ whnf (\n -> f n n) k

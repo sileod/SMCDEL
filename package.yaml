@@ -214,6 +214,7 @@ benchmarks:
       - smcdel
       - split
       - vector
+      - containers
     when:
     - condition: flag(with-cudd)
       then:
