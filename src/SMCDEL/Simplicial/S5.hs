@@ -258,80 +258,36 @@ instance Update PointedSimplicialModelS5 PointedSimplicialActionModelS5 where
             Just this -> this
         newcur = [ pairToInt (v, v') | v <- curSM, v' <- curAM, agAt sm v == agAt am v' ]
 
--- Example 28 in [Dit+22, p. 39], without factual change
-ex28SM :: SimplicialModelS5
-ex28SM = SMS5 
-    [[1, 2, 3], [2, 3, 5], [2, 4, 5], [3, 5, 6]] 
-    (M.fromList [ (1, ("c", M.singleton (P 3) False))
-                , (2, ("b", M.singleton (P 2) True ))
-                , (3, ("a", M.singleton (P 1) True )) 
-                , (4, ("a", M.singleton (P 1) False)) 
-                , (5, ("c", M.singleton (P 3) True ))
-                , (6, ("b", M.singleton (P 2) False)) ])
+instance Arbitrary SimplicialActionModelS5 where
+    arbitrary = do
+        randVerts <- M.fromList <$> mapM (\v -> do
+            let ag = show $ (v `mod` 5) + 1
+                prpInt = read ag - 1 
+            BF pre <- sized $ randomboolformWith [P 0 .. P 4]
+            post <- frequency [ (1, elements [Top, Bot]) 
+                              , (2, return (PrpF (P prpInt))) ]
+            let postMap = M.singleton (P prpInt) post
+            return (v, (ag, pre, postMap))
+            ) [5..11 :: Vert]
+        let verts = M.insert 0 ("1", Top, M.empty) $ 
+                    M.insert 1 ("2", Top, M.empty) $ 
+                    M.insert 2 ("3", Top, M.empty) $ 
+                    M.insert 3 ("4", Top, M.empty) $ 
+                    M.insert 4 ("5", Top, M.empty) $ 
+                    randVerts
+        return $
+            SActMS5
+               [ [0, 1, 2, 3, 4]
+               , [2, 3, 5, 9, 11]
+               , [3, 4, 5, 6, 7]
+               , [0, 4, 7, 8, 10] ]
+               verts
 
-ex28AM :: SimplicialActionModelS5
-ex28AM = SActMS5 
-    [[1, 2, 3], [2, 3, 4]] 
-    (M.fromList [ (1, ( "c" 
-                      , Neg (PrpF (P 3))
-                      , M.empty))
-                , (2, ( "b"
-                      , Neg (disj (K "b" (PrpF (P 3))) (K "b" (Neg (PrpF (P 3)))))
-                      , M.empty))
-                , (3, ( "a"
-                      , Neg (disj (K "a" (PrpF (P 3))) (K "a" (Neg (PrpF (P 3)))))
-                      , M.empty))
-                , (4, ( "c"
-                      , PrpF (P 3)
-                      , M.empty)) ])
-
-ex28SMxAM :: SimplicialModelS5
-ex28SMxAM = ex28SM `update` ex28AM
-
-ex28PointedSM :: PointedSimplicialModelS5
-ex28PointedSM = (ex28SM, [2, 3, 5] :: Facet)
-
-ex28PointedAM :: PointedSimplicialActionModelS5
-ex28PointedAM = (ex28AM, [2, 3, 4] :: Facet)
-
-ex28PointedSMxAM :: PointedSimplicialModelS5
-ex28PointedSMxAM = ex28PointedSM `update` ex28PointedAM
-
--- Example 29 in [Dit+22, p. 40], with factual change
-ex29SM :: SimplicialModelS5
-ex29SM = SMS5
-    [[1, 2, 3], [2, 3, 4]]
-    (M.fromList [ (1, ("c", M.singleton (P 3) False))
-                , (2, ("b", M.singleton (P 2) True ))
-                , (3, ("a", M.singleton (P 1) True ))
-                , (4, ("c", M.singleton (P 3) True )) ])
-
-ex29AM :: SimplicialActionModelS5
-ex29AM = SActMS5
-    [[1, 2, 3]] 
-    (M.fromList [ (1, ("c", Top, M.singleton (P 3) Top))
-                , (2, ("b", Top, M.empty))
-                , (3, ("a", Top, M.empty)) ])
-
-ex29SMxAM :: SimplicialModelS5
-ex29SMxAM = ex29SM `update` ex29AM
-
-{-
->>> ex28SMxAM
-SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,False)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))])
-
->>> ex28PointedSMxAM
-(SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,False)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))]),[2,3,4])
-
->>> ex28PointedSMxAM |= K "b" (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))
-True
-
->>> ex28PointedSM |= (Dia (Dyn "(ex28AM, [2, 3, 4])" (toDyn ex28PointedAM)) (K "b" (K "c" (PrpF (P 2)) `disj` K "c" (Neg (PrpF (P 2))))))
-True
-
->>> ex29SMxAM
-SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,True)])),(2,("b",fromList [(P 2,True)])),(3,("a",fromList [(P 1,True)])),(4,("c",fromList [(P 3,True)]))])
--}
+instance {-# OVERLAPPING #-} Arbitrary PointedSimplicialActionModelS5 where
+    arbitrary = do
+        sm <- arbitrary :: Gen SimplicialActionModelS5
+        x <- elements (facetsOf sm)
+        return (sm, x)
 
 -- * Visualization
 
@@ -339,9 +295,9 @@ SMS5 [[1,2,3],[2,3,4]] (fromList [(1,("c",fromList [(P 3,True)])),(2,("b",fromLi
 
 instance KripkeLike SimplicialModelS5 where
     directed = const False
-    getNodes sm@(SMS5 sc verts) = map (show &&& labelOf) (vertsOf sm) where
-        labelOf v = "$ " ++ (agAt sm v) ++ " $" ++ ", " ++ tex (snd (verts M.! v))
-    getEdges (SMS5 sc verts) = nub [ ("", show x, show y) | facet <- sc, x <- facet, y <- facet, x < y]
+    getNodes sm@(SMS5 _ verts) = map (show &&& labelOf) (vertsOf sm) where
+        labelOf v = "$ " ++ agAt sm v ++ " $" ++ ", " ++ tex (snd (verts M.! v))
+    getEdges (SMS5 sc _) = nub [ ("", show x, show y) | facet <- sc, x <- facet, y <- facet, x < y]
 
 instance TexAble SimplicialModelS5 where
   tex           = tex.ViaDot
