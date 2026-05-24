@@ -253,6 +253,24 @@ test-suite k
     , smcdel
   default-language: Haskell2010
 
+test-suite simplicial
+  type: exitcode-stdio-1.0
+  main-is: test/Simplicial.hs
+  other-modules:
+      Paths_smcdel
+  ghc-options: -Wall -with-rtsopts=-M8G
+  build-tools:
+      alex
+    , happy
+  build-depends:
+      HasCacBDD >=0.3.0.0 && <0.4
+    , QuickCheck
+    , base >=4.8 && <5
+    , containers
+    , hspec
+    , smcdel
+  default-language: Haskell2010
+
 test-suite translations
   type: exitcode-stdio-1.0
   main-is: test/Translations.hs
