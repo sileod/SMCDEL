@@ -91,14 +91,12 @@ getRelFacets sm@(SMS5 sc _) facet ags = filter (\x -> ags `subseteq` sharedAgs x
 -- common knowledge (closure of singleStarB)
 -- See 1.6.1 in [Dit+22] for detailed definition of starB 
 getStarB :: SimplicialModelS5 -> [Agent] -> Facet -> [Facet]
-getStarB sm ags cur = lfp (singleStarB sm ags) [cur]
-
--- | Get a list of all facets where some agent from the given list sits at an 
---  intersection of any facet in the given list, including the given facets
-singleStarB :: SimplicialModelS5 -> [Agent] -> [Facet] -> [Facet]
-singleStarB sm@(SMS5 sc _) ags facets = filter (\x -> any (connectedByAgs x) facets) sc where
-    connectedByAgs f1 f2 = any (`elem` sharedAgs) ags where
-        sharedAgs = map (agAt sm) (f1 `intersect` f2)
+getStarB sm@(SMS5 sc _) ags cur = lfp singleStarB [cur] where
+    -- get all facets where some agent sits at an intersection with any facet from the given list
+    singleStarB :: [Facet] -> [Facet]
+    singleStarB facets = filter (\x -> any (connectedByAgs x) facets) sc where
+        connectedByAgs f1 f2 = any (`elem` sharedAgs) ags where
+            sharedAgs = map (agAt sm) (f1 `intersect` f2)
 
 eval :: PointedSimplicialModelS5 -> Form -> Bool
 eval _ Top = True
@@ -273,7 +271,7 @@ instance Arbitrary SimplicialActionModelS5 where
                     M.insert 1 ("2", Top, M.empty) $ 
                     M.insert 2 ("3", Top, M.empty) $ 
                     M.insert 3 ("4", Top, M.empty) $ 
-                    M.insert 4 ("5", Top, M.empty) $ 
+                    M.insert 4 ("5", Top, M.empty)
                     randVerts
         return $
             SActMS5
