@@ -418,12 +418,12 @@ kripkeToSimpWithMap krm@(KrMS5 ws rel val)
   | isProper krm && isLocal krm = (SMS5 sc vertMap, internalToActual)
   | otherwise = kripkeToSimpWithMap $ makeLocalAndProper krm
   where
-    vertInternal = concatMap (\pair -> map (, fst pair) (snd pair)) rel -- [([World], Agent)]
-    internalToActual vInt = fromJust (vInt `elemIndex` vertInternal) + 1
+    vertInternal = concatMap (\(ag, part) -> map (, ag) part) rel -- [([World], Agent)]
+    internalToActual vPair = fromJust (vPair `elemIndex` vertInternal) + 1
     sc = map (worldToFacet krm internalToActual) ws
     vertMap = M.fromList $ map (\v -> (internalToActual v, (snd v, ass v))) vertInternal
-    ass vInt = M.fromList $ map (\p -> (p, pInV vInt p)) (localPs (snd vInt))
-    pInV vInt = apply (apply val (head $ fst vInt))
+    ass vPair = M.fromList $ map (\p -> (p, pInV vPair p)) (localPs (snd vPair))
+    pInV vPair = apply (apply val (head $ fst vPair))
     localPs ag = filter (\p -> isLocalVarForAg krm p ag) (vocabOf krm)
 
 -- | Convert a pointed Kripke model to a pointed simplicial model
@@ -453,7 +453,6 @@ worldToFacet krm internToAct w = map (internToAct . vert) (agentsOf usedKrm) whe
 -- | Check whether a given Kripke model is proper
 -- uses the following equivalence: 
 -- \[\bigcap_{i\in A}R_i = Id \iff \forall s\in W(\bigcap_{i\in A}[s]_i = \{s\})\]
--- (for proof see Sec. 3.2.2 of thesis)
 isProper :: KripkeModelS5 -> Bool
 isProper m@(KrMS5 _ rel _) = all (\w -> intersectAll (map (`equivClass` w) (agentsOf m)) == [w]) (worldsOf m) where
   equivClass ag world = fromJust $ find (world `elem`) (apply rel ag) -- \([world]_{ag}\)
