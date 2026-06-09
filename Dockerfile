@@ -5,6 +5,7 @@ ENV PATH=/root/.local/bin:/root/.ghcup/bin:$PATH
 
 RUN apt-get update && apt-get install -y \
     build-essential curl git libffi-dev libgmp-dev libncurses-dev libtinfo5 \
+    zlib1g-dev \
     graphviz dot2tex texlive-latex-base poppler-utils preview-latex-style texlive-pstricks \
  && rm -rf /var/lib/apt/lists/*
 
@@ -23,8 +24,9 @@ RUN stack build --flag smcdel:web --copy-bins --local-bin-path /usr/local/bin
 
 FROM ubuntu:22.04
 
+ENV DEBIAN_FRONTEND=noninteractive TZ=UTC
 RUN apt-get update && apt-get install -y \
-    libgmp10 libffi7 libncurses5 libtinfo5 graphviz dot2tex poppler-utils \
+    tzdata libgmp10 libffi7 libncurses5 libtinfo5 graphviz dot2tex poppler-utils zlib1g \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/bin/smcdel /usr/local/bin/smcdel
